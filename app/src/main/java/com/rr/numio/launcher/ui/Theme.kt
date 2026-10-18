@@ -23,6 +23,8 @@ data class NumioColors(
     val card: Color,
     /** True when drawn straight on the phone wallpaper (white ink with a shadow). */
     val onWallpaper: Boolean = false,
+    /** Ink's hand-drawn look (sketch icons, letters, wobbly lines). False for Sol's clean look. */
+    val sketch: Boolean = true,
 )
 
 private val PaperLight = NumioColors(
@@ -48,6 +50,16 @@ private val OnWallpaper = NumioColors(
     gold = Color(0xFFF2C14E),
     card = Color(0x33000000),
     onWallpaper = true,
+)
+
+/** Numio Sol: warm cream paper, charcoal ink, mustard sun. Always light, to sit on its wallpaper. */
+val SolColors = NumioColors(
+    background = Color(0xFFF3EBDD),
+    ink = Color(0xFF2B2722),
+    inkSoft = Color(0xFF6E6458),
+    gold = Color(0xFFD4A23A),
+    card = Color(0xFFF7F1E6),
+    sketch = false,
 )
 
 fun paperColors(dark: Boolean) = if (dark) PaperDark else PaperLight

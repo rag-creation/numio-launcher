@@ -2,6 +2,7 @@ package com.rr.numio.launcher.ui
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Box
@@ -53,6 +54,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.Velocity
@@ -177,12 +179,16 @@ fun ShelfScreen(vm: LauncherViewModel, mode: ShelfMode, modifier: Modifier = Mod
                     )
                 },
         ) {
-            Box(
-                Modifier
-                    .width(36.dp)
-                    .height(6.dp)
-                    .sketchBorder(colors.inkSoft, 3.dp, seed = 21, width = 1.4.dp)
-            )
+            if (colors.sketch) {
+                Box(
+                    Modifier
+                        .width(36.dp)
+                        .height(6.dp)
+                        .sketchBorder(colors.inkSoft, 3.dp, seed = 21, width = 1.4.dp)
+                )
+            } else {
+                Box(Modifier.width(36.dp).height(4.dp).background(colors.inkSoft.copy(alpha = 0.45f), CircleShape))
+            }
         }
 
         Box(Modifier.weight(1f).fillMaxWidth()) {
@@ -258,14 +264,22 @@ private fun SectionHeader(header: ShelfItem.Header, colors: NumioColors) {
                 Box(Modifier.size(12.dp).background(colors.gold, CircleShape))
                 Spacer(Modifier.width(10.dp))
                 val upper = title.uppercase()
-                if (upper.all { it == ' ' || SketchInk.hasGlyph(it) }) {
+                if (colors.sketch && upper.all { it == ' ' || SketchInk.hasGlyph(it) }) {
                     SketchText(upper, 18.dp, colors.gold)
                 } else {
                     Text(title, style = TextStyle(color = colors.gold, fontSize = 18.sp))
                 }
             }
-        } else if (title == "#") {
-            Text("#", style = TextStyle(color = colors.gold, fontSize = 20.sp))
+        } else if (title == "#" || !colors.sketch) {
+            // Sol: clean type in ink, the letter a touch bolder
+            Text(
+                title,
+                style = TextStyle(
+                    color = if (colors.sketch) colors.gold else colors.inkSoft,
+                    fontSize = if (colors.sketch) 20.sp else 15.sp,
+                    fontWeight = if (colors.sketch) null else FontWeight.SemiBold,
+                ),
+            )
         } else {
             SketchText(title, 20.dp, colors.gold)
         }
@@ -286,7 +300,15 @@ private fun SearchBar(
             .padding(horizontal = 24.dp, vertical = 12.dp)
             .fillMaxWidth()
             .height(46.dp)
-            .sketchBorder(colors.inkSoft.copy(alpha = 0.7f), 23.dp, seed = 3, fill = colors.card, width = 1.2.dp, wobble = 0.5f)
+            .then(
+                if (colors.sketch) {
+                    Modifier.sketchBorder(colors.inkSoft.copy(alpha = 0.7f), 23.dp, seed = 3, fill = colors.card, width = 1.2.dp, wobble = 0.5f)
+                } else {
+                    Modifier
+                        .background(colors.card, CircleShape)
+                        .border(1.dp, colors.ink.copy(alpha = 0.10f), CircleShape)
+                }
+            )
             .padding(start = 18.dp, end = 8.dp),
     ) {
         Box(Modifier.size(8.dp).background(colors.gold, CircleShape))

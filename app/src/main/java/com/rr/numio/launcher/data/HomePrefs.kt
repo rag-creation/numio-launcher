@@ -12,6 +12,9 @@ private val Context.homeStore by preferencesDataStore(name = "home")
 
 enum class Background { Paper, Wallpaper }
 
+/** The two home screen designs. Both share the same apps, dock, Shelf and settings. */
+enum class HomeTheme { Ink, Sol }
+
 /** Home screen settings that must survive restarts: the dock and the background. */
 class HomePrefs(context: Context) {
 
@@ -24,6 +27,14 @@ class HomePrefs(context: Context) {
 
     val background: Flow<Background> = store.data.map { p ->
         if (p[BACKGROUND] == "wallpaper") Background.Wallpaper else Background.Paper
+    }
+
+    val theme: Flow<HomeTheme> = store.data.map { p ->
+        if (p[THEME] == "sol") HomeTheme.Sol else HomeTheme.Ink
+    }
+
+    suspend fun setTheme(theme: HomeTheme) {
+        store.edit { it[THEME] = if (theme == HomeTheme.Sol) "sol" else "ink" }
     }
 
     /** Show the next calendar event on the Today line. Off until the user turns it on. */
@@ -46,5 +57,6 @@ class HomePrefs(context: Context) {
         private val DOCK = stringPreferencesKey("dock")
         private val BACKGROUND = stringPreferencesKey("background")
         private val SHOW_CALENDAR = booleanPreferencesKey("show_calendar")
+        private val THEME = stringPreferencesKey("theme")
     }
 }

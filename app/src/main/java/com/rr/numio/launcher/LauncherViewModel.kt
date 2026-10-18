@@ -9,6 +9,7 @@ import com.rr.numio.launcher.data.AppRepository
 import com.rr.numio.launcher.data.Background
 import com.rr.numio.launcher.data.DefaultDock
 import com.rr.numio.launcher.data.HomePrefs
+import com.rr.numio.launcher.data.HomeTheme
 import com.rr.numio.launcher.data.TodaySource
 import com.rr.numio.launcher.search.AppSearch
 import kotlinx.coroutines.Dispatchers
@@ -51,6 +52,14 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
     val showCalendar: StateFlow<Boolean> =
         combine(showCalendarPref, _calendarAccess) { on, access -> on && access }
             .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
+    val theme: StateFlow<HomeTheme> =
+        prefs.theme.stateIn(viewModelScope, SharingStarted.Eagerly, HomeTheme.Ink)
+
+    /** Switching only changes the look; the dock, apps and other settings stay as they are. */
+    fun setTheme(theme: HomeTheme) {
+        viewModelScope.launch { prefs.setTheme(theme) }
+    }
 
     val background: StateFlow<Background> =
         prefs.background.stateIn(viewModelScope, SharingStarted.Eagerly, Background.Paper)

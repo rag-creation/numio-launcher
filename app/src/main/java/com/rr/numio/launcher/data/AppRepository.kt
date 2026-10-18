@@ -14,6 +14,7 @@ import android.os.Process
 import android.os.UserHandle
 import android.os.UserManager
 import android.widget.Toast
+import com.rr.numio.launcher.icons.RealIcons
 import com.rr.numio.launcher.sketch.SketchIcons
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -68,6 +69,7 @@ class AppRepository(context: Context, private val scope: CoroutineScope) {
 
     private fun changed(packageName: String) {
         SketchIcons.evictPackage(packageName)
+        RealIcons.evictPackage(packageName)
         reload()
     }
 

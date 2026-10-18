@@ -3,6 +3,8 @@ package com.rr.numio.launcher.ui
 import android.app.ActivityOptions
 import android.graphics.Rect
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.border
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
@@ -43,14 +45,20 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.rr.numio.launcher.LauncherViewModel
 import com.rr.numio.launcher.data.AppEntry
+import com.rr.numio.launcher.icons.RealIcons
 import com.rr.numio.launcher.sketch.SketchIcons
 
+/** Ink draws its own sketch icon; Sol shows the app's real icon. */
 @Composable
-fun AppIcon(entry: AppEntry, size: Dp, modifier: Modifier = Modifier) {
+fun AppIcon(entry: AppEntry, size: Dp, modifier: Modifier = Modifier, sketch: Boolean = true) {
     val context = LocalContext.current
     val px = with(LocalDensity.current) { size.roundToPx() }
-    val bitmap: ImageBitmap? by produceState(SketchIcons.cached(entry, px), entry.key, px) {
-        if (value == null) value = SketchIcons.load(context, entry, px)
+    val start = if (sketch) SketchIcons.cached(entry, px) else RealIcons.cached(entry, px)
+    val bitmap: ImageBitmap? by produceState(start, entry.key, px, sketch) {
+        if (value == null) {
+            value = if (sketch) SketchIcons.load(context, entry, px)
+            else RealIcons.load(context, entry, px) ?: SketchIcons.load(context, entry, px)
+        }
     }
     Box(modifier.size(size)) {
         bitmap?.let { Image(it, contentDescription = null, modifier = Modifier.fillMaxSize()) }
@@ -108,13 +116,16 @@ fun AppTile(
                 )
                 .padding(vertical = 6.dp),
         ) {
-            val ring = if (highlighted) {
-                Modifier.sketchBorder(colors.gold, iconSize, seed = 5, width = 2.dp)
-            } else Modifier
+            val ring = when {
+                !highlighted -> Modifier
+                colors.sketch -> Modifier.sketchBorder(colors.gold, iconSize, seed = 5, width = 2.dp)
+                else -> Modifier.border(2.dp, colors.gold, RoundedCornerShape(iconSize * 0.36f))
+            }
             Box(ring.padding(if (highlighted) 3.dp else 0.dp)) {
                 AppIcon(
                     entry, iconSize,
                     Modifier.onGloballyPositioned { bounds = it.boundsInWindow() },
+                    sketch = colors.sketch,
                 )
             }
             if (showLabel) {
