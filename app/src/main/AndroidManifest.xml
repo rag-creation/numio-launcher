@@ -4,6 +4,8 @@
     <!-- No INTERNET permission. -->
     <!-- Lets "Uninstall" in the long-press menu open the system uninstall dialog. -->
     <uses-permission android:name="android.permission.REQUEST_DELETE_PACKAGES" />
+    <!-- Optional: only asked for if you turn on "Show next calendar event". Read only. -->
+    <uses-permission android:name="android.permission.READ_CALENDAR" />
 
     <!-- Package visibility: only apps with a launcher icon, plus the apps the
          default dock looks for. No QUERY_ALL_PACKAGES. -->

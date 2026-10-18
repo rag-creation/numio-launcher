@@ -6,6 +6,7 @@ import android.content.Intent
 import android.content.pm.LauncherApps
 import android.graphics.Rect
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -78,7 +79,16 @@ class AppRepository(context: Context, private val scope: CoroutineScope) {
     private fun load(): List<AppEntry> {
         val me = Process.myUserHandle()
         val out = ArrayList<AppEntry>()
+        val usedProfileLabels = HashSet<String>()
         for (user in launcherApps.profiles) {
+            val isMain = user == me
+            // Two profiles of the same kind get "Work", "Work 2"
+            val profileName = if (isMain) null else profileLabel(user).let { base ->
+                var label = base
+                var n = 2
+                while (!usedProfileLabels.add(label)) label = "$base ${n++}"
+                label
+            }
             // A locked work profile or private space can throw; just skip it
             val list = try {
                 launcherApps.getActivityList(null, user)
@@ -95,13 +105,46 @@ class AppRepository(context: Context, private val scope: CoroutineScope) {
                     label = label,
                     component = cn,
                     user = user,
-                    isMainUser = user == me,
+                    isMainUser = isMain,
                     info = info,
+                    profileLabel = profileName,
                 )
             }
         }
         val collator = Collator.getInstance().apply { strength = Collator.PRIMARY }
-        return out.sortedWith { a, b -> collator.compare(a.label, b.label) }
+        // The same activity in the same profile is listed once, however it was reported
+        val unique = out.distinctBy { it.key }.sortedWith { a, b -> collator.compare(a.label, b.label) }
+
+        // Same name inside one profile → give each a maker line
+        val withLabels = arrayOfNulls<String>(unique.size)
+        unique.indices.groupBy { unique[it].user }.values.forEach { idx ->
+            val labels = AppNaming.clashLabels(
+                idx.map { Triple(unique[it].label, unique[it].packageName, unique[it].component.className) }
+            )
+            idx.forEachIndexed { k, i -> withLabels[i] = labels[k] }
+        }
+        return unique.mapIndexed { i, e ->
+            if (withLabels[i] == null) e
+            else AppEntry(e.key, e.label, e.component, e.user, e.isMainUser, e.info, e.profileLabel, withLabels[i])
+        }
+    }
+
+    /** What kind of second profile this is, in words the user knows. */
+    private fun profileLabel(user: UserHandle): String {
+        if (Build.VERSION.SDK_INT >= 35) {
+            val type = try {
+                launcherApps.getLauncherUserInfo(user)?.userType
+            } catch (e: Exception) {
+                null
+            }.orEmpty().lowercase()
+            when {
+                type.endsWith(".managed") -> return "Work"
+                type.endsWith(".private") -> return "Private"
+                type.endsWith(".clone") || "dual" in type -> return "Dual apps"
+                "knox" in type || "secure" in type -> return "Secure Folder"
+            }
+        }
+        return "Second profile"
     }
 
     fun launch(entry: AppEntry, bounds: Rect?, options: Bundle?) {

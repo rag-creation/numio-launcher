@@ -63,11 +63,13 @@ fun Modifier.sketchBorder(
     seed: Int,
     fill: Color = Color.Transparent,
     width: Dp = 1.6.dp,
+    /** How shaky the line is, relative to its width. */
+    wobble: Float = 0.9f,
 ): Modifier = drawWithCache {
     val sw = width.toPx()
     val r = radius.toPx().coerceAtMost(minOf(size.width, size.height) / 2f - sw).coerceAtLeast(0f)
     val rect = RectF(sw, sw, size.width - sw, size.height - sw)
-    val line = SketchInk.wobblyRect(rect, r, sw * 0.9f, seed).asComposePath()
+    val line = SketchInk.wobblyRect(rect, r, sw * wobble, seed).asComposePath()
     val body = Path().apply {
         addRoundRect(RoundRect(sw, sw, size.width - sw, size.height - sw, CornerRadius(r)))
     }

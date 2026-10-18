@@ -9,6 +9,7 @@ import com.rr.numio.launcher.data.AppRepository
 import com.rr.numio.launcher.data.Background
 import com.rr.numio.launcher.data.DefaultDock
 import com.rr.numio.launcher.data.HomePrefs
+import com.rr.numio.launcher.data.TodaySource
 import com.rr.numio.launcher.search.AppSearch
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -40,6 +41,16 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
 
     private val _isDefaultHome = MutableStateFlow(true)
     val isDefaultHome: StateFlow<Boolean> = _isDefaultHome.asStateFlow()
+
+    private val showCalendarPref: StateFlow<Boolean> =
+        prefs.showCalendar.stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
+    private val _calendarAccess = MutableStateFlow(TodaySource.hasCalendarAccess(app))
+
+    /** The next-event part of the Today line is on only when chosen AND allowed. */
+    val showCalendar: StateFlow<Boolean> =
+        combine(showCalendarPref, _calendarAccess) { on, access -> on && access }
+            .stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
     val background: StateFlow<Background> =
         prefs.background.stateIn(viewModelScope, SharingStarted.Eagerly, Background.Paper)
@@ -89,6 +100,15 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
 
     fun refreshDefaultHome() {
         _isDefaultHome.value = HomeRole.isDefault(getApplication())
+        // Calendar access can be taken away in Settings at any time
+        _calendarAccess.value = TodaySource.hasCalendarAccess(getApplication())
+    }
+
+    fun hasCalendarAccess() = TodaySource.hasCalendarAccess(getApplication())
+
+    fun setShowCalendar(on: Boolean) {
+        _calendarAccess.value = TodaySource.hasCalendarAccess(getApplication())
+        viewModelScope.launch { prefs.setShowCalendar(on) }
     }
 
     fun setBackground(bg: Background) {

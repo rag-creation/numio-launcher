@@ -11,9 +11,13 @@ class AppEntry(
     val label: String,
     val component: ComponentName,
     val user: UserHandle,
-    /** False for work-profile or private-space apps. */
+    /** False for work-profile, Secure Folder, clone or private-space apps. */
     val isMainUser: Boolean,
     val info: LauncherActivityInfo,
+    /** "Work", "Secure Folder"… for apps outside the main profile, else null. */
+    val profileLabel: String? = null,
+    /** Maker line ("Samsung", "Fossify") shown only when another app has the same name. */
+    val clashLabel: String? = null,
 ) {
     val packageName: String get() = component.packageName
 }

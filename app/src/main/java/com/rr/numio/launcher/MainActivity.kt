@@ -1,13 +1,17 @@
 package com.rr.numio.launcher
 
+import android.Manifest
 import android.content.ActivityNotFoundException
+import android.content.ContentUris
 import android.content.Intent
 import android.graphics.Color
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.AlarmClock
+import android.provider.CalendarContract
 import android.provider.Settings
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.BackHandler
@@ -47,6 +51,15 @@ class MainActivity : ComponentActivity() {
     private val roleRequest = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
         vm.refreshDefaultHome()
         if (!HomeRole.isDefault(this)) HomeRole.openHomeSettings(this)
+    }
+
+    // "Show next calendar event": asked only when the user turns it on
+    private val calendarPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted) {
+            vm.setShowCalendar(true)
+        } else {
+            Toast.makeText(this, "Calendar access is needed to show your next event", Toast.LENGTH_SHORT).show()
+        }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -96,6 +109,8 @@ class MainActivity : ComponentActivity() {
                 onRequestHome = ::requestHome,
                 onOpenClock = ::openClock,
                 onOpenLauncherInfo = ::openLauncherInfo,
+                onToggleCalendar = ::toggleCalendar,
+                onOpenEvent = ::openEvent,
                 modifier = Modifier.graphicsLayer {
                     scaleX = canvasScale
                     scaleY = canvasScale
@@ -152,6 +167,24 @@ class MainActivity : ComponentActivity() {
             startActivity(Intent(AlarmClock.ACTION_SHOW_ALARMS))
         } catch (e: ActivityNotFoundException) {
             // no clock app at all
+        }
+    }
+
+    private fun toggleCalendar() {
+        when {
+            vm.showCalendar.value -> vm.setShowCalendar(false)
+            vm.hasCalendarAccess() -> vm.setShowCalendar(true)
+            else -> calendarPermission.launch(Manifest.permission.READ_CALENDAR)
+        }
+    }
+
+    private fun openEvent(id: Long, begin: Long) {
+        val intent = Intent(Intent.ACTION_VIEW, ContentUris.withAppendedId(CalendarContract.Events.CONTENT_URI, id))
+            .putExtra(CalendarContract.EXTRA_EVENT_BEGIN_TIME, begin)
+        try {
+            startActivity(intent)
+        } catch (e: ActivityNotFoundException) {
+            // no calendar app to show it
         }
     }
 

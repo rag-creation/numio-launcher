@@ -63,11 +63,12 @@ import com.rr.numio.launcher.LauncherViewModel
 import com.rr.numio.launcher.ShelfMode
 import com.rr.numio.launcher.data.AppEntry
 import com.rr.numio.launcher.search.AppSearch
+import com.rr.numio.launcher.sketch.SketchInk
 
-/** One row of the Shelf grid: a letter heading or an app. */
+/** One row of the Shelf grid: a heading (a letter or a profile name) or an app. */
 private sealed interface ShelfItem {
-    data class Header(val letter: String) : ShelfItem
-    data class App(val entry: AppEntry) : ShelfItem
+    data class Header(val title: String, val isProfile: Boolean = false) : ShelfItem
+    data class App(val entry: AppEntry, val subtitle: String?) : ShelfItem
 }
 
 /** First letter for the A–Z headings; everything else (digits, other scripts) goes under "#". */
@@ -105,12 +106,19 @@ fun ShelfScreen(vm: LauncherViewModel, mode: ShelfMode, modifier: Modifier = Mod
 
     val shelfItems: List<ShelfItem> = remember(results, searching) {
         if (searching) {
-            results.map { ShelfItem.App(it) }
+            // One ranked list; second-profile apps say which profile they're from
+            results.map { ShelfItem.App(it, listOfNotNull(it.clashLabel, it.profileLabel).joinToString(" · ").ifEmpty { null }) }
         } else {
             buildList {
-                results.groupBy { sectionOf(it.label) }.forEach { (letter, list) ->
+                // Main profile A–Z with letter headings…
+                results.filter { it.isMainUser }.groupBy { sectionOf(it.label) }.forEach { (letter, list) ->
                     add(ShelfItem.Header(letter))
-                    list.forEach { add(ShelfItem.App(it)) }
+                    list.forEach { add(ShelfItem.App(it, it.clashLabel)) }
+                }
+                // …then each second profile (Work, Secure Folder…) as its own section at the end
+                results.filter { !it.isMainUser }.groupBy { it.profileLabel ?: "Second profile" }.forEach { (name, list) ->
+                    add(ShelfItem.Header(name, isProfile = true))
+                    list.forEach { add(ShelfItem.App(it, it.clashLabel)) }
                 }
             }
         }
@@ -193,16 +201,17 @@ fun ShelfScreen(vm: LauncherViewModel, mode: ShelfMode, modifier: Modifier = Mod
                 ) {
                     items(
                         shelfItems,
-                        key = { if (it is ShelfItem.App) it.entry.key else "h:" + (it as ShelfItem.Header).letter },
+                        key = { if (it is ShelfItem.App) it.entry.key else "h:" + (it as ShelfItem.Header).title },
                         span = { if (it is ShelfItem.Header) GridItemSpan(maxLineSpan) else GridItemSpan(1) },
                         contentType = { if (it is ShelfItem.Header) 0 else 1 },
                     ) { item ->
                         when (item) {
-                            is ShelfItem.Header -> SectionHeader(item.letter, colors)
+                            is ShelfItem.Header -> SectionHeader(item, colors)
                             is ShelfItem.App -> AppTile(
                                 item.entry, vm, colors,
                                 iconSize = 52.dp,
                                 highlighted = searching && item.entry.key == results.firstOrNull()?.key,
+                                subtitle = item.subtitle,
                             )
                         }
                     }
@@ -221,17 +230,44 @@ fun ShelfScreen(vm: LauncherViewModel, mode: ShelfMode, modifier: Modifier = Mod
 }
 
 @Composable
-private fun SectionHeader(letter: String, colors: NumioColors) {
-    Box(
+private fun SectionHeader(header: ShelfItem.Header, colors: NumioColors) {
+    val title = header.title
+    Column(
         Modifier
             .fillMaxWidth()
-            .padding(start = 10.dp, top = 14.dp, bottom = 2.dp)
-            .semantics { heading(); contentDescription = if (letter == "#") "Other" else letter },
+            .padding(start = 10.dp, top = if (header.isProfile) 28.dp else 14.dp, bottom = 2.dp)
+            .semantics(mergeDescendants = true) {
+                heading()
+                contentDescription = when {
+                    header.isProfile -> "$title apps"
+                    title == "#" -> "Other"
+                    else -> title
+                }
+            },
     ) {
-        if (letter == "#") {
+        if (header.isProfile) {
+            // A short ink rule, then the profile name with a gold badge like the icons'
+            Box(
+                Modifier
+                    .padding(end = 10.dp, bottom = 14.dp)
+                    .fillMaxWidth()
+                    .height(2.dp)
+                    .background(colors.inkSoft.copy(alpha = 0.35f))
+            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.size(12.dp).background(colors.gold, CircleShape))
+                Spacer(Modifier.width(10.dp))
+                val upper = title.uppercase()
+                if (upper.all { it == ' ' || SketchInk.hasGlyph(it) }) {
+                    SketchText(upper, 18.dp, colors.gold)
+                } else {
+                    Text(title, style = TextStyle(color = colors.gold, fontSize = 18.sp))
+                }
+            }
+        } else if (title == "#") {
             Text("#", style = TextStyle(color = colors.gold, fontSize = 20.sp))
         } else {
-            SketchText(letter, 20.dp, colors.gold)
+            SketchText(title, 20.dp, colors.gold)
         }
     }
 }
@@ -249,11 +285,11 @@ private fun SearchBar(
         modifier = Modifier
             .padding(horizontal = 24.dp, vertical = 12.dp)
             .fillMaxWidth()
-            .height(50.dp)
-            .sketchBorder(colors.inkSoft, 25.dp, seed = 3, fill = colors.card)
-            .padding(start = 20.dp, end = 8.dp),
+            .height(46.dp)
+            .sketchBorder(colors.inkSoft.copy(alpha = 0.7f), 23.dp, seed = 3, fill = colors.card, width = 1.2.dp, wobble = 0.5f)
+            .padding(start = 18.dp, end = 8.dp),
     ) {
-        Box(Modifier.size(9.dp).background(colors.gold, CircleShape))
+        Box(Modifier.size(8.dp).background(colors.gold, CircleShape))
         Spacer(Modifier.width(12.dp))
         Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
             if (query.isEmpty()) {

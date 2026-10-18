@@ -1,6 +1,7 @@
 package com.rr.numio.launcher.data
 
 import android.content.Context
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
@@ -25,6 +26,13 @@ class HomePrefs(context: Context) {
         if (p[BACKGROUND] == "wallpaper") Background.Wallpaper else Background.Paper
     }
 
+    /** Show the next calendar event on the Today line. Off until the user turns it on. */
+    val showCalendar: Flow<Boolean> = store.data.map { p -> p[SHOW_CALENDAR] ?: false }
+
+    suspend fun setShowCalendar(on: Boolean) {
+        store.edit { it[SHOW_CALENDAR] = on }
+    }
+
     suspend fun setDock(keys: List<String>) {
         store.edit { it[DOCK] = keys.joinToString("\n") }
     }
@@ -37,5 +45,6 @@ class HomePrefs(context: Context) {
         const val DOCK_MAX = 5
         private val DOCK = stringPreferencesKey("dock")
         private val BACKGROUND = stringPreferencesKey("background")
+        private val SHOW_CALENDAR = booleanPreferencesKey("show_calendar")
     }
 }

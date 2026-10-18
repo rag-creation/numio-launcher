@@ -70,6 +70,8 @@ fun AppTile(
     modifier: Modifier = Modifier,
     showLabel: Boolean = true,
     highlighted: Boolean = false,
+    /** Small grey line under the name: the maker for same-name apps, or the profile. */
+    subtitle: String? = null,
 ) {
     val view = LocalView.current
     val haptics = LocalHapticFeedback.current
@@ -81,7 +83,10 @@ fun AppTile(
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier
                 .fillMaxWidth()
-                .semantics { contentDescription = entry.label }
+                .semantics {
+                    contentDescription = listOfNotNull(entry.label, subtitle, entry.profileLabel?.let { "$it profile" })
+                        .distinct().joinToString(", ")
+                }
                 .combinedClickable(
                     interactionSource = remember { MutableInteractionSource() },
                     indication = null,
@@ -121,6 +126,15 @@ fun AppTile(
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
                 )
+                if (subtitle != null) {
+                    Text(
+                        subtitle,
+                        style = TextStyle(color = colors.inkSoft, fontSize = 10.5.sp, textAlign = TextAlign.Center),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
+                    )
+                }
             }
         }
 

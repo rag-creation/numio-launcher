@@ -10,6 +10,8 @@ Every icon is drawn in the Numio **Sketch** style (wobbly ink on warm paper, wit
 
 **Canvas: the home screen**
 - A sketch clock and date. Tap it to open Clock by Numio, or your phone's alarms if it isn't installed
+- A gold stroke under the date that grows through the day
+- A quiet Today line: your next alarm, and (only if you turn it on) your next calendar event. Hidden when there's nothing to show
 - A dock of up to 5 apps (starts with your phone, messages, browser and camera)
 - Paper background, or your own wallpaper with white ink
 - Long-press the empty space for home options
@@ -19,14 +21,17 @@ Every icon is drawn in the Numio **Sketch** style (wobbly ink on warm paper, wit
 - Search bar at the bottom, near your thumb. Tap the search pill on the home screen and start typing; Enter opens the top result
 - Finds apps by the start of the name, any word ("maps"), initials ("yt") or letters in order
 - Long-press an app: add to dock, app info, uninstall
+- Apps from a second profile (Work, Secure Folder, Dual apps…) have a gold badge and their own section at the end
+- Apps that share a name get a small second line saying who made them ("Calendar / Samsung", "Calendar / Fossify")
 - Pull down or press Back to close
 
 **Icons**
 - Apps with a themed (monochrome) icon get it inked onto a paper disc
-- Others get their first letter from the hand-drawn A–Z sheet
+- Others (and apps whose themed icon is just a solid shape) get their first letter from the hand-drawn A–Z sheet
 - Hand-drawn icons for common apps are coming
 
 No internet permission, no ads, no tracking. It only sees apps that have a launcher icon.
+Calendar access is optional and asked for only when you turn on the next-event line; it is read only.
 
 ## Samsung phones
 
