@@ -104,6 +104,8 @@ fun AppTile(
     val description = listOfNotNull(entry.label, subtitle, entry.profileLabel?.let { "$it profile" })
         .distinct().joinToString(", ")
 
+    // Plain tiles (Shelf, Ink) keep the tested click handling on the content; rearrangeable
+    // tiles get the tap/hold/drag gesture on the outer box, which stays put while the icon moves.
     val gesture = if (reorder == null) {
         Modifier
             .semantics { contentDescription = description }
@@ -140,6 +142,7 @@ fun AppTile(
                     if (reorder.dragging != index) reorder.slots[index] = it.boundsInWindow()
                 } else Modifier
             )
+            .then(if (reorder != null) gesture else Modifier)
             .zIndex(if (lifted) 1f else 0f)
             .graphicsLayer {
                 if (lifted) {
@@ -154,7 +157,7 @@ fun AppTile(
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier
                 .fillMaxWidth()
-                .then(gesture)
+                .then(if (reorder == null) gesture else Modifier)
                 .padding(vertical = 6.dp),
         ) {
             val ring = when {

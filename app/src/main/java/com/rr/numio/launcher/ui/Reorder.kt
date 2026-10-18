@@ -14,7 +14,6 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.input.pointer.changedToUp
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.input.pointer.positionChange
 
 /**
  * Drag-to-rearrange for one row set (Sol's home rows, or the dock).
@@ -37,9 +36,10 @@ class Reorder(private val onMove: (from: Int, to: Int) -> Unit) {
         target = index
     }
 
-    fun drag(delta: Offset) {
+    /** [total] is how far the finger has moved since the hold, in screen pixels. */
+    fun drag(total: Offset) {
         if (dragging < 0) return
-        offset += delta
+        offset = total
         val centre = (slots[dragging] ?: return).center + offset
         target = slots.minByOrNull { (it.value.center - centre).getDistance() }?.key ?: dragging
     }
@@ -61,13 +61,15 @@ fun rememberReorder(onMove: (from: Int, to: Int) -> Unit): Reorder {
 /**
  * One gesture for a home icon: tap opens, hold shows the menu, hold-and-move drags it.
  * Moving before the hold isn't consumed, so a swipe that starts on an icon still opens the Shelf.
+ * Put it on a part of the tile that does NOT move while dragging, so [onDrag]'s total is the
+ * real finger travel (measured inside the moving icon it would only follow at half speed).
  */
 fun Modifier.tapHoldDrag(
     key: Any,
     onTap: () -> Unit,
     onHold: () -> Unit,
     onDragStart: () -> Unit,
-    onDrag: (Offset) -> Unit,
+    onDrag: (total: Offset) -> Unit,
     onDragEnd: () -> Unit,
 ): Modifier = pointerInput(key) {
     awaitEachGesture {
@@ -93,7 +95,6 @@ fun Modifier.tapHoldDrag(
             else -> {
                 onHold()
                 var dragging = false
-                var moved = Offset.Zero
                 var done = false
                 while (!done) {
                     val change = awaitPointerEvent().changes.firstOrNull { it.id == down.id }
@@ -101,13 +102,12 @@ fun Modifier.tapHoldDrag(
                         change?.consume()
                         done = true
                     } else {
-                        val delta = change.positionChange()
-                        moved += delta
-                        if (!dragging && moved.getDistance() > slop) {
+                        val total = change.position - down.position
+                        if (!dragging && total.getDistance() > slop) {
                             dragging = true
                             onDragStart()
                         }
-                        if (dragging) onDrag(delta)
+                        if (dragging) onDrag(total)
                         change.consume()
                     }
                 }
