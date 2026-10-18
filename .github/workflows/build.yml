@@ -1,0 +1,71 @@
+name: Build APK
+
+# Test builds only. Real releases are built and signed on RR's own computer,
+# so the Numio signing key never goes to GitHub.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      # Keep the same throwaway test key between builds, so a new test build
+      # installs over the last one (and your dock stays).
+      - uses: actions/cache@v4
+        with:
+          path: ~/.android/debug.keystore
+          key: launcher-test-key
+
+      # staging = release settings (R8 on), signed with the test key, app id ...launcher.test
+      # assembleRelease too, so a problem in the real release build shows up here first.
+      - name: Build test APK
+        run: |
+          chmod +x gradlew
+          set -o pipefail
+          ./gradlew --no-daemon testDebugUnitTest assembleStaging assembleRelease 2>&1 | tee build.log
+
+      # On failure, turn the first error lines into annotations so they show on the run page.
+      - name: Report build errors
+        if: failure()
+        run: |
+          grep -E "^e: |What went wrong|^ +> |error:|Could not" build.log | grep -v "> Task" | head -30 | while IFS= read -r line; do
+            echo "::error::${line//%/%25}"
+          done
+
+      - name: Name the APK
+        run: |
+          cp app/build/outputs/apk/staging/app-staging.apk LauncherTest.apk
+          echo "APK_NAME=LauncherTest.apk" >> "$GITHUB_ENV"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: LauncherTest.apk
+          path: LauncherTest.apk
+
+      # The APK also goes on a draft release named "Test build" (Releases page, only you see it).
+      # A draft has no git tag, so F-Droid's update check never sees it.
+      - name: Publish test build (draft)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete test-build -y --cleanup-tag || true
+          for id in $(gh api repos/$GITHUB_REPOSITORY/releases --jq '.[] | select(.draft and .name == "Test build") | .id'); do
+            gh api -X DELETE repos/$GITHUB_REPOSITORY/releases/$id
+          done
+          gh release create "test-${GITHUB_SHA::7}" "$APK_NAME" --draft \
+            --target "$GITHUB_SHA" --title "Test build" \
+            --notes "Latest build from main (${GITHUB_SHA::7}). For testing only. Installs as Launcher Test, next to the real app."
