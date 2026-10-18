@@ -32,6 +32,15 @@ class HomePrefs(context: Context) {
         if (p[BACKGROUND] == "wallpaper") Background.Wallpaper else Background.Paper
     }
 
+    /** Apps placed on Sol's home rows, in order (up to [HOME_MAX]). */
+    val homeApps: Flow<List<String>> = store.data.map { p ->
+        p[HOME_APPS]?.split('\n')?.filter { it.isNotEmpty() }.orEmpty()
+    }
+
+    suspend fun setHomeApps(keys: List<String>) {
+        store.edit { it[HOME_APPS] = keys.joinToString("\n") }
+    }
+
     val theme: Flow<HomeTheme> = store.data.map { p ->
         if (p[THEME] == "sol") HomeTheme.Sol else HomeTheme.Ink
     }
@@ -65,10 +74,12 @@ class HomePrefs(context: Context) {
 
     companion object {
         const val DOCK_MAX = 5
+        const val HOME_MAX = 10
         private val DOCK = stringPreferencesKey("dock")
         private val BACKGROUND = stringPreferencesKey("background")
         private val SHOW_CALENDAR = booleanPreferencesKey("show_calendar")
         private val THEME = stringPreferencesKey("theme")
         private val SOL_WALLPAPER = stringPreferencesKey("sol_wallpaper")
+        private val HOME_APPS = stringPreferencesKey("home_apps")
     }
 }

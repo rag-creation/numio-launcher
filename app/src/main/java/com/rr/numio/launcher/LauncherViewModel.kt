@@ -79,6 +79,29 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
             keys.orEmpty().mapNotNull { byKey[it] }
         }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
+    /** Apps on Sol's home rows (uninstalled ones simply drop out). */
+    val homeApps: StateFlow<List<AppEntry>> =
+        combine(repo.apps.filterNotNull(), prefs.homeApps) { apps, keys ->
+            val byKey = apps.associateBy { it.key }
+            keys.mapNotNull { byKey[it] }
+        }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
+    fun isOnHome(entry: AppEntry) = homeApps.value.any { it.key == entry.key }
+
+    fun addToHome(entry: AppEntry) {
+        val current = homeApps.value.map { it.key }
+        if (entry.key in current) return
+        if (current.size >= HomePrefs.HOME_MAX) {
+            Toast.makeText(getApplication(), "Home holds ${HomePrefs.HOME_MAX} apps", Toast.LENGTH_SHORT).show()
+            return
+        }
+        viewModelScope.launch { prefs.setHomeApps(current + entry.key) }
+    }
+
+    fun removeFromHome(entry: AppEntry) {
+        viewModelScope.launch { prefs.setHomeApps(homeApps.value.map { it.key } - entry.key) }
+    }
+
     /** Search results; with no query, every app A–Z. */
     val results: StateFlow<List<AppEntry>> =
         combine(repo.apps.filterNotNull(), _query) { apps, q -> AppSearch.rank(q, apps) { it.label } }

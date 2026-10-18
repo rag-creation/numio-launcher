@@ -146,6 +146,7 @@ class MainActivity : ComponentActivity() {
                         onToggleCalendar = ::toggleCalendar,
                         onOpenEvent = ::openEvent,
                         onSwitchTheme = { vm.setTheme(HomeTheme.Ink) },
+                        onOpenCalendar = ::openCalendar,
                     )
                 }
             }
@@ -217,6 +218,17 @@ class MainActivity : ComponentActivity() {
             startActivity(intent)
         } catch (e: ActivityNotFoundException) {
             // no calendar app to show it
+        }
+    }
+
+    /** The phone's calendar app, at today. */
+    private fun openCalendar() {
+        val uri = CalendarContract.CONTENT_URI.buildUpon().appendPath("time")
+            .also { ContentUris.appendId(it, System.currentTimeMillis()) }.build()
+        try {
+            startActivity(Intent(Intent.ACTION_VIEW, uri))
+        } catch (e: ActivityNotFoundException) {
+            // no calendar app
         }
     }
 

@@ -28,6 +28,49 @@ object TodaySource {
         ContextCompat.checkSelfPermission(context, Manifest.permission.READ_CALENDAR) ==
             PackageManager.PERMISSION_GRANTED
 
+    /**
+     * Days (1..31) of the given month on which an event you haven't declined starts.
+     * [month0] is 0-based like java.util.Calendar. Empty without calendar access.
+     * Run off the main thread.
+     */
+    fun eventDays(context: Context, year: Int, month0: Int): Set<Int> {
+        if (!hasCalendarAccess(context)) return emptySet()
+        val local = java.util.Calendar.getInstance().apply {
+            clear(); set(year, month0, 1)
+        }
+        // A day of slack either side so all-day events (stored at UTC midnight) aren't missed
+        val start = local.timeInMillis - 24 * HOUR
+        local.add(java.util.Calendar.MONTH, 1)
+        val end = local.timeInMillis + 24 * HOUR
+        val uri = CalendarContract.Instances.CONTENT_URI.buildUpon().also {
+            ContentUris.appendId(it, start)
+            ContentUris.appendId(it, end)
+        }.build()
+        val selection = "${CalendarContract.Instances.VISIBLE} = 1" +
+            " AND ${CalendarContract.Instances.SELF_ATTENDEE_STATUS} != ${CalendarContract.Attendees.ATTENDEE_STATUS_DECLINED}"
+        val days = HashSet<Int>()
+        val utc = java.util.TimeZone.getTimeZone("UTC")
+        val cal = java.util.Calendar.getInstance()
+        return try {
+            context.contentResolver.query(
+                uri, arrayOf(CalendarContract.Instances.BEGIN, CalendarContract.Instances.ALL_DAY),
+                selection, null, null,
+            )?.use { c ->
+                while (c.moveToNext()) {
+                    // all-day events are stored at UTC midnight, so read their date in UTC
+                    cal.timeZone = if (c.getInt(1) == 1) utc else java.util.TimeZone.getDefault()
+                    cal.timeInMillis = c.getLong(0)
+                    if (cal.get(java.util.Calendar.YEAR) == year && cal.get(java.util.Calendar.MONTH) == month0) {
+                        days += cal.get(java.util.Calendar.DAY_OF_MONTH)
+                    }
+                }
+            }
+            days
+        } catch (e: Exception) {
+            emptySet()
+        }
+    }
+
     /** The next timed event in the coming hours that you haven't declined. Run off the main thread. */
     fun nextEvent(context: Context, now: Long): NextEvent? {
         if (!hasCalendarAccess(context)) return null

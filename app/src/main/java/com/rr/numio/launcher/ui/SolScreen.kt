@@ -43,6 +43,7 @@ import androidx.compose.ui.BiasAlignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
@@ -90,9 +91,11 @@ fun SolScreen(
     onToggleCalendar: () -> Unit,
     onOpenEvent: (id: Long, begin: Long) -> Unit,
     onSwitchTheme: () -> Unit,
+    onOpenCalendar: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val colors = SolColors
+    val homeApps by vm.homeApps.collectAsStateWithLifecycle()
     val dock by vm.dock.collectAsStateWithLifecycle()
     val isDefault by vm.isDefaultHome.collectAsStateWithLifecycle()
     val showCalendar by vm.showCalendar.collectAsStateWithLifecycle()
@@ -123,49 +126,60 @@ fun SolScreen(
             alignment = BiasAlignment(0f, 0.4f),
             modifier = Modifier.fillMaxSize(),
         )
-        Column(
+        BoxWithConstraints(
             Modifier
                 .fillMaxSize()
                 .statusBarsPadding()
                 .navigationBarsPadding()
                 .windowInsetsPadding(WindowInsets.displayCutout.only(WindowInsetsSides.Horizontal))
-                .padding(horizontal = 26.dp),
+                .padding(horizontal = 24.dp),
         ) {
-            Spacer(Modifier.height(36.dp))
-            SolClock(colors, now, onOpenClock)
-            SolToday(colors, now, showCalendar, onOpenClock, onOpenEvent)
+            // On short screens the month card steps aside so the apps never get squeezed
+            val roomForCard = maxHeight >= 700.dp
+            Column(Modifier.fillMaxSize()) {
+                Spacer(Modifier.height(28.dp))
+                SolClock(colors, now, onOpenClock)
+                SolToday(colors, now, showCalendar, onOpenClock, onOpenEvent)
 
-            if (!isDefault) {
-                Spacer(Modifier.height(18.dp))
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(colors.card.copy(alpha = 0.92f), RoundedCornerShape(18.dp))
-                        .border(1.dp, colors.gold, RoundedCornerShape(18.dp))
-                        .clickable(onClick = onRequestHome)
-                        .padding(horizontal = 16.dp, vertical = 14.dp),
-                ) {
-                    Text("Make Numio your home screen", style = TextStyle(color = colors.ink, fontSize = 15.sp), modifier = Modifier.weight(1f))
-                    Text("Set", style = TextStyle(color = colors.ink, fontSize = 15.sp, fontWeight = FontWeight.SemiBold))
+                if (!isDefault) {
+                    Spacer(Modifier.height(16.dp))
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(colors.card.copy(alpha = 0.92f), RoundedCornerShape(18.dp))
+                            .border(1.dp, colors.gold, RoundedCornerShape(18.dp))
+                            .clickable(onClick = onRequestHome)
+                            .padding(horizontal = 16.dp, vertical = 14.dp),
+                    ) {
+                        Text("Make Numio your home screen", style = TextStyle(color = colors.ink, fontSize = 15.sp), modifier = Modifier.weight(1f))
+                        Text("Set", style = TextStyle(color = colors.ink, fontSize = 15.sp, fontWeight = FontWeight.SemiBold))
+                    }
+                } else if (roomForCard) {
+                    Spacer(Modifier.height(18.dp))
+                    MonthCard(now, showCalendar, onOpenCalendar, Modifier.fillMaxWidth(0.6f))
                 }
+
+                SolMenuArea(
+                    colors = colors,
+                    isDefault = isDefault,
+                    showCalendar = showCalendar,
+                    wallpaper = wallpaper,
+                    onWallpaper = vm::setSolWallpaper,
+                    onToggleCalendar = onToggleCalendar,
+                    onSwitchTheme = onSwitchTheme,
+                    onRequestHome = onRequestHome,
+                    onLauncherInfo = onOpenLauncherInfo,
+                    modifier = Modifier.weight(1f).fillMaxWidth(),
+                )
+
+                HomeRows(vm, colors, homeApps)
+                Spacer(Modifier.height(14.dp))
+                SolDock(vm, colors, dock)
+                Spacer(Modifier.height(16.dp))
+                SolSearchPill(colors) { vm.openShelf(ShelfMode.Search) }
+                Spacer(Modifier.height(14.dp))
             }
-
-            SolMenuArea(
-                colors = colors,
-                isDefault = isDefault,
-                showCalendar = showCalendar,
-                onToggleCalendar = onToggleCalendar,
-                onSwitchTheme = onSwitchTheme,
-                onRequestHome = onRequestHome,
-                onLauncherInfo = onOpenLauncherInfo,
-                modifier = Modifier.weight(1f).fillMaxWidth(),
-            )
-
-            SolDock(vm, colors, dock)
-            Spacer(Modifier.height(18.dp))
-            SolSearchPill(colors) { vm.openShelf(ShelfMode.Search) }
-            Spacer(Modifier.height(14.dp))
         }
     }
 }
@@ -193,7 +207,7 @@ private fun SolClock(colors: NumioColors, now: Long, onOpenClock: () -> Unit) {
     ) {
         // Sized in dp, not sp: the clock is already large, so it shouldn't grow with font scale
         val density = LocalDensity.current
-        val clockSize = minOf(118.dp, maxWidth * 0.52f)
+        val clockSize = minOf(112.dp, maxWidth * 0.48f)
         val clockSp = with(density) { clockSize.toSp() }
         Column {
             Text(
@@ -274,6 +288,8 @@ private fun SolMenuArea(
     colors: NumioColors,
     isDefault: Boolean,
     showCalendar: Boolean,
+    wallpaper: SolWallpaper,
+    onWallpaper: (SolWallpaper) -> Unit,
     onToggleCalendar: () -> Unit,
     onSwitchTheme: () -> Unit,
     onRequestHome: () -> Unit,
@@ -295,6 +311,14 @@ private fun SolMenuArea(
         Box(Modifier.offset(x = with(density) { (at?.x ?: 0f).toDp() }, y = with(density) { (at?.y ?: 0f).toDp() })) {
             DropdownMenu(expanded = at != null, onDismissRequest = { menuAt = null }, offset = DpOffset.Zero) {
                 DropdownMenuItem(
+                    text = { Text(if (wallpaper == SolWallpaper.Garden) "✓  Garden wallpaper" else "Garden wallpaper") },
+                    onClick = { menuAt = null; onWallpaper(SolWallpaper.Garden) },
+                )
+                DropdownMenuItem(
+                    text = { Text(if (wallpaper == SolWallpaper.Petal) "✓  Petal wallpaper" else "Petal wallpaper") },
+                    onClick = { menuAt = null; onWallpaper(SolWallpaper.Petal) },
+                )
+                DropdownMenuItem(
                     text = { Text(if (showCalendar) "✓  Show next calendar event" else "Show next calendar event") },
                     onClick = { menuAt = null; onToggleCalendar() },
                 )
@@ -308,54 +332,63 @@ private fun SolMenuArea(
     }
 }
 
-/** The same dock as Ink, shown as the apps' real icons on soft cream tiles. */
+/** Sol's home rows: up to two rows of five apps you place with "Add to home". */
 @Composable
-private fun SolDock(vm: LauncherViewModel, colors: NumioColors, dock: List<AppEntry>) {
-    if (dock.isEmpty()) {
+private fun HomeRows(vm: LauncherViewModel, colors: NumioColors, apps: List<AppEntry>) {
+    if (apps.isEmpty()) {
         Text(
-            "Long-press an app in the Shelf to add it here",
+            "Long-press an app in the Shelf and choose Add to home",
             style = TextStyle(color = colors.inkSoft, fontSize = 13.sp),
             modifier = Modifier
-                .fillMaxWidth()
-                .background(colors.card.copy(alpha = 0.8f), RoundedCornerShape(16.dp))
-                .padding(14.dp),
+                .background(colors.card.copy(alpha = 0.78f), RoundedCornerShape(14.dp))
+                .padding(horizontal = 14.dp, vertical = 10.dp),
         )
         return
     }
-    val tile = RoundedCornerShape(20.dp)
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        apps.chunked(5).forEach { row ->
+            // five equal slots, so rows line up in columns even when a row isn't full
+            Row(Modifier.fillMaxWidth()) {
+                row.forEach { entry ->
+                    Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                        AppTile(entry, vm, colors, iconSize = 56.dp, showLabel = false, modifier = Modifier.width(64.dp))
+                    }
+                }
+                repeat(5 - row.size) { Spacer(Modifier.weight(1f)) }
+            }
+        }
+    }
+}
+
+/** The same dock as Ink, with Sol's themed icons. */
+@Composable
+private fun SolDock(vm: LauncherViewModel, colors: NumioColors, dock: List<AppEntry>) {
+    if (dock.isEmpty()) return
     Row(
         horizontalArrangement = Arrangement.SpaceEvenly,
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier.fillMaxWidth(),
     ) {
         dock.forEach { entry ->
-            Box(
-                contentAlignment = Alignment.Center,
-                modifier = Modifier
-                    .size(60.dp)
-                    .shadow(3.dp, tile, clip = false)
-                    .background(colors.card, tile),
-            ) {
-                AppTile(entry, vm, colors, iconSize = 44.dp, showLabel = false, modifier = Modifier.width(56.dp))
-            }
+            AppTile(entry, vm, colors, iconSize = 56.dp, showLabel = false, modifier = Modifier.width(64.dp))
         }
     }
 }
 
+/** A dark pill, the one strong contrast on the light screen. */
 @Composable
 private fun SolSearchPill(colors: NumioColors, onClick: () -> Unit) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
             .fillMaxWidth()
-            .height(46.dp)
-            .background(colors.card.copy(alpha = 0.86f), CircleShape)
-            .border(1.dp, colors.ink.copy(alpha = 0.08f), CircleShape)
+            .height(50.dp)
+            .background(Color(0xF2282520), CircleShape)
             .clickable(role = Role.Button, onClickLabel = "Search apps", onClick = onClick)
-            .padding(horizontal = 20.dp),
+            .padding(horizontal = 22.dp),
     ) {
-        Box(Modifier.size(8.dp).background(colors.gold, CircleShape))
-        Spacer(Modifier.width(12.dp))
-        Text("Search", style = TextStyle(color = colors.inkSoft, fontSize = 15.sp))
+        Box(Modifier.size(9.dp).background(colors.gold, CircleShape))
+        Spacer(Modifier.width(14.dp))
+        Text("Search", style = TextStyle(color = Color(0xFFE1DACC), fontSize = 16.sp))
     }
 }

@@ -19,6 +19,7 @@ Every icon is drawn in the Numio **Sketch** style (wobbly ink on warm paper, wit
 **Two looks: Ink and Sol**
 - **Ink** (the default): dark or cream paper, hand-drawn sketch icons and clock
 - **Sol**: warm cream with one of two original wallpapers, Garden (painted: a dabbed sun, a cross-hatched stone, a gouache hill, a dry-brush sweep) or Petal (cut paper), a big serif clock, a month calendar, home rows and themed icons
+- Sol's home has a month calendar (real dates; event dots only with calendar access) and up to two rows of apps: long-press any app and choose Add to home
 - Switch from the long-press menu on the home screen. Your dock and apps stay exactly as they are
 
 **Shelf: all your apps**

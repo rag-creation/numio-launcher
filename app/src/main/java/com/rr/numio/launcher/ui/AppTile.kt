@@ -149,6 +149,17 @@ fun AppTile(
         }
 
         DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+            if (!colors.sketch) {
+                // Sol also has home rows
+                val onHome = vm.isOnHome(entry)
+                DropdownMenuItem(
+                    text = { Text(if (onHome) "Remove from home" else "Add to home") },
+                    onClick = {
+                        menu = false
+                        if (onHome) vm.removeFromHome(entry) else vm.addToHome(entry)
+                    },
+                )
+            }
             val inDock = vm.isInDock(entry)
             DropdownMenuItem(
                 text = { Text(if (inDock) "Remove from dock" else "Add to dock") },
