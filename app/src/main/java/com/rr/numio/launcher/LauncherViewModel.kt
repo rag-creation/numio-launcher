@@ -10,6 +10,7 @@ import com.rr.numio.launcher.data.Background
 import com.rr.numio.launcher.data.DefaultDock
 import com.rr.numio.launcher.data.HomePrefs
 import com.rr.numio.launcher.data.HomeTheme
+import com.rr.numio.launcher.data.SolClock
 import com.rr.numio.launcher.data.SolWallpaper
 import com.rr.numio.launcher.data.TodaySource
 import com.rr.numio.launcher.search.AppSearch
@@ -68,6 +69,15 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
 
     fun setSolWallpaper(w: SolWallpaper) {
         viewModelScope.launch { prefs.setSolWallpaper(w) }
+    }
+
+    val solClock: StateFlow<SolClock> =
+        prefs.solClock.stateIn(viewModelScope, SharingStarted.Eagerly, SolClock.Fraunces)
+
+    /** Next clock style, round and round (the menu stays open so you can tap through them). */
+    fun nextSolClock() {
+        val all = SolClock.entries
+        viewModelScope.launch { prefs.setSolClock(all[(all.indexOf(solClock.value) + 1) % all.size]) }
     }
 
     val background: StateFlow<Background> =

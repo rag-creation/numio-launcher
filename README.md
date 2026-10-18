@@ -49,8 +49,12 @@ Kotlin, Jetpack Compose and DataStore. Uses Android's own LauncherApps and RoleM
 
 ## Fonts
 
-Sol's clock uses [Fraunces](https://github.com/undercasetype/Fraunces) by Undercase Type,
-licensed under the SIL Open Font License 1.1 (see `licenses/OFL-Fraunces.txt`), subset to digits.
+Sol's clock styles use these fonts, subset to digits, all under the SIL Open Font License 1.1
+(licences in `licenses/`):
+[Fraunces](https://fonts.google.com/specimen/Fraunces) by Undercase Type,
+[DM Serif Display](https://fonts.google.com/specimen/DM+Serif+Display) by Colophon Foundry,
+[Baloo 2](https://fonts.google.com/specimen/Baloo+2) by Ek Type and
+[Moirai One](https://fonts.google.com/specimen/Moirai+One) by Jiyeon Park.
 
 ## License
 

@@ -18,6 +18,14 @@ enum class HomeTheme { Ink, Sol }
 /** Sol's two wallpapers: Garden (painted, the default) and Petal (cut paper). */
 enum class SolWallpaper { Garden, Petal }
 
+/** Sol's clock styles. [id] is what's saved, so renaming a label never loses the choice. */
+enum class SolClock(val id: String, val label: String) {
+    Fraunces("fraunces", "Fraunces"),
+    DmSerif("dmserif", "DM Serif"),
+    Baloo("baloo", "Baloo"),
+    Moirai("moirai", "Moirai"),
+}
+
 /** Home screen settings that must survive restarts: the dock and the background. */
 class HomePrefs(context: Context) {
 
@@ -57,6 +65,14 @@ class HomePrefs(context: Context) {
         store.edit { it[SOL_WALLPAPER] = if (w == SolWallpaper.Petal) "petal" else "garden" }
     }
 
+    val solClock: Flow<SolClock> = store.data.map { p ->
+        SolClock.entries.firstOrNull { it.id == p[SOL_CLOCK] } ?: SolClock.Fraunces
+    }
+
+    suspend fun setSolClock(c: SolClock) {
+        store.edit { it[SOL_CLOCK] = c.id }
+    }
+
     /** Show the next calendar event on the Today line. Off until the user turns it on. */
     val showCalendar: Flow<Boolean> = store.data.map { p -> p[SHOW_CALENDAR] ?: false }
 
@@ -81,5 +97,6 @@ class HomePrefs(context: Context) {
         private val THEME = stringPreferencesKey("theme")
         private val SOL_WALLPAPER = stringPreferencesKey("sol_wallpaper")
         private val HOME_APPS = stringPreferencesKey("home_apps")
+        private val SOL_CLOCK = stringPreferencesKey("sol_clock")
     }
 }

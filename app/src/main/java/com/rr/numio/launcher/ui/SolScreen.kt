@@ -56,6 +56,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -69,13 +70,19 @@ import com.rr.numio.launcher.LauncherViewModel
 import com.rr.numio.launcher.R
 import com.rr.numio.launcher.ShelfMode
 import com.rr.numio.launcher.data.AppEntry
+import com.rr.numio.launcher.data.SolClock
 import com.rr.numio.launcher.data.SolWallpaper
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-/** Sol's big clock: Fraunces Bold, a soft editorial serif (digits and colon only). */
-private val SolClockFont = FontFamily(Font(R.font.fraunces_bold, FontWeight.Bold))
+/** Sol's clock fonts, each bundled as digits and colon only. */
+private val ClockFonts = mapOf(
+    SolClock.Fraunces to FontFamily(Font(R.font.fraunces_bold, FontWeight.Bold)),
+    SolClock.DmSerif to FontFamily(Font(R.font.dmserif_display, FontWeight.Normal)),
+    SolClock.Baloo to FontFamily(Font(R.font.baloo2_extrabold, FontWeight.ExtraBold)),
+    SolClock.Moirai to FontFamily(Font(R.font.moirai_one, FontWeight.Normal)),
+)
 
 /**
  * Numio Sol home: the Petal wallpaper does the work. Date and a large light clock in the
@@ -100,6 +107,7 @@ fun SolScreen(
     val isDefault by vm.isDefaultHome.collectAsStateWithLifecycle()
     val showCalendar by vm.showCalendar.collectAsStateWithLifecycle()
     val wallpaper by vm.solWallpaper.collectAsStateWithLifecycle()
+    val clockStyle by vm.solClock.collectAsStateWithLifecycle()
     val swipe = with(LocalDensity.current) { 56.dp.toPx() }
     val now = rememberNow()
 
@@ -138,7 +146,7 @@ fun SolScreen(
             val roomForCard = maxHeight >= 700.dp
             Column(Modifier.fillMaxSize()) {
                 Spacer(Modifier.height(28.dp))
-                SolClock(colors, now, onOpenClock)
+                SolClockView(colors, now, clockStyle, onOpenClock)
                 SolToday(colors, now, showCalendar, onOpenClock, onOpenEvent)
 
                 if (!isDefault) {
@@ -166,6 +174,8 @@ fun SolScreen(
                     showCalendar = showCalendar,
                     wallpaper = wallpaper,
                     onWallpaper = vm::setSolWallpaper,
+                    clockStyle = clockStyle,
+                    onNextClock = vm::nextSolClock,
                     onToggleCalendar = onToggleCalendar,
                     onSwitchTheme = onSwitchTheme,
                     onRequestHome = onRequestHome,
@@ -185,7 +195,7 @@ fun SolScreen(
 }
 
 @Composable
-private fun SolClock(colors: NumioColors, now: Long, onOpenClock: () -> Unit) {
+private fun SolClockView(colors: NumioColors, now: Long, style: SolClock, onOpenClock: () -> Unit) {
     val context = LocalContext.current
     val is24 = DateFormat.is24HourFormat(context)
     val time = SimpleDateFormat(if (is24) "HH:mm" else "h:mm", Locale.ENGLISH).format(Date(now))
@@ -205,10 +215,23 @@ private fun SolClock(colors: NumioColors, now: Long, onOpenClock: () -> Unit) {
                 onClick = onOpenClock,
             ),
     ) {
-        // Sized in dp, not sp: the clock is already large, so it shouldn't grow with font scale
+        // Sized in dp, not sp: the clock is already large, so it shouldn't grow with font scale.
+        // Each font is a different width, so measure "00:00" and shrink until it fits.
         val density = LocalDensity.current
-        val clockSize = minOf(112.dp, maxWidth * 0.48f)
-        val clockSp = with(density) { clockSize.toSp() }
+        val measurer = rememberTextMeasurer()
+        val family = ClockFonts.getValue(style)
+        val clockSp = remember(style, maxWidth, density) {
+            var size = 112.dp
+            while (size > 48.dp) {
+                val w = measurer.measure(
+                    "00:00",
+                    TextStyle(fontFamily = family, fontSize = with(density) { size.toSp() }, fontFeatureSettings = "tnum"),
+                ).size.width
+                if (w <= with(density) { (maxWidth - 8.dp).toPx() }) break
+                size -= 4.dp
+            }
+            with(density) { size.toSp() }
+        }
         Column {
             Text(
                 date,
@@ -221,10 +244,9 @@ private fun SolClock(colors: NumioColors, now: Long, onOpenClock: () -> Unit) {
                 time,
                 style = TextStyle(
                     color = colors.ink,
-                    fontFamily = SolClockFont,
-                    fontWeight = FontWeight.Bold,
+                    fontFamily = family,
                     fontSize = clockSp,
-                    lineHeight = clockSp,
+                    lineHeight = clockSp * 1.08f,
                     letterSpacing = (-0.02).em,
                     fontFeatureSettings = "tnum",
                 ),
@@ -290,6 +312,8 @@ private fun SolMenuArea(
     showCalendar: Boolean,
     wallpaper: SolWallpaper,
     onWallpaper: (SolWallpaper) -> Unit,
+    clockStyle: SolClock,
+    onNextClock: () -> Unit,
     onToggleCalendar: () -> Unit,
     onSwitchTheme: () -> Unit,
     onRequestHome: () -> Unit,
@@ -310,6 +334,11 @@ private fun SolMenuArea(
         val at = menuAt
         Box(Modifier.offset(x = with(density) { (at?.x ?: 0f).toDp() }, y = with(density) { (at?.y ?: 0f).toDp() })) {
             DropdownMenu(expanded = at != null, onDismissRequest = { menuAt = null }, offset = DpOffset.Zero) {
+                DropdownMenuItem(
+                    text = { Text("Clock style: ${clockStyle.label}  ›") },
+                    // stays open: tap again to try the next style
+                    onClick = onNextClock,
+                )
                 DropdownMenuItem(
                     text = { Text(if (wallpaper == SolWallpaper.Garden) "✓  Garden wallpaper" else "Garden wallpaper") },
                     onClick = { menuAt = null; onWallpaper(SolWallpaper.Garden) },
@@ -337,7 +366,7 @@ private fun SolMenuArea(
 private fun HomeRows(vm: LauncherViewModel, colors: NumioColors, apps: List<AppEntry>) {
     if (apps.isEmpty()) {
         Text(
-            "Long-press an app in the Shelf and choose Add to home",
+            "Long-press any app, then Add to home",
             style = TextStyle(color = colors.inkSoft, fontSize = 13.sp),
             modifier = Modifier
                 .background(colors.card.copy(alpha = 0.78f), RoundedCornerShape(14.dp))
