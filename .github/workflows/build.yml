@@ -46,6 +46,19 @@ jobs:
             echo "::error::${line//%/%25}"
           done
 
+      # One line per test class (tests run, failures, skipped), shown on the run page
+      - name: Test summary
+        if: always()
+        run: |
+          for f in app/build/test-results/testDebugUnitTest/*.xml; do
+            [ -f "$f" ] || continue
+            name=$(grep -o 'testsuite name="[^"]*"' "$f" | head -1 | sed 's/.*name="//;s/"//')
+            t=$(grep -o 'tests="[0-9]*"' "$f" | head -1 | tr -dc 0-9)
+            fl=$(grep -o 'failures="[0-9]*"' "$f" | head -1 | tr -dc 0-9)
+            sk=$(grep -o 'skipped="[0-9]*"' "$f" | head -1 | tr -dc 0-9)
+            echo "::notice::${name##*.}: ${t} tests, ${fl} failed, ${sk} skipped"
+          done
+
       - name: Name the APK
         run: |
           cp app/build/outputs/apk/staging/app-staging.apk LauncherTest.apk
