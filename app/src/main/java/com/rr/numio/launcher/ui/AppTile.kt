@@ -29,13 +29,17 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect as ComposeRect
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.onClick
+import androidx.compose.ui.semantics.onLongClick
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextAlign
@@ -79,48 +83,86 @@ fun AppTile(
     highlighted: Boolean = false,
     /** Small grey line under the name: the maker for same-name apps, or the profile. */
     subtitle: String? = null,
+    /** Set for icons that can be rearranged (Sol's home rows and dock): hold and move to drag. */
+    reorder: Reorder? = null,
+    index: Int = -1,
 ) {
     val view = LocalView.current
     val haptics = LocalHapticFeedback.current
     var bounds by remember { mutableStateOf(ComposeRect.Zero) }
     var menu by remember { mutableStateOf(false) }
 
-    Box(modifier) {
+    val open = {
+        val r = Rect(bounds.left.toInt(), bounds.top.toInt(), bounds.right.toInt(), bounds.bottom.toInt())
+        val options = ActivityOptions.makeScaleUpAnimation(view, r.left, r.top, r.width(), r.height()).toBundle()
+        vm.launch(entry, r, options)
+    }
+    val hold = {
+        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+        menu = true
+    }
+    val description = listOfNotNull(entry.label, subtitle, entry.profileLabel?.let { "$it profile" })
+        .distinct().joinToString(", ")
+
+    val gesture = if (reorder == null) {
+        Modifier
+            .semantics { contentDescription = description }
+            .combinedClickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClick = open,
+                onLongClick = hold,
+                onLongClickLabel = "App options",
+            )
+    } else {
+        Modifier
+            .semantics {
+                contentDescription = description
+                onClick(label = "Open") { open(); true }
+                onLongClick(label = "App options") { hold(); true }
+            }
+            .tapHoldDrag(
+                key = entry.key to index,
+                onTap = open,
+                onHold = hold,
+                onDragStart = { menu = false; reorder.start(index) },
+                onDrag = reorder::drag,
+                onDragEnd = reorder::end,
+            )
+    }
+    val lifted = reorder != null && reorder.dragging == index
+    val isTarget = reorder != null && reorder.dragging >= 0 && reorder.target == index && !lifted
+
+    Box(
+        modifier
+            .then(
+                if (reorder != null) Modifier.onGloballyPositioned {
+                    if (reorder.dragging != index) reorder.slots[index] = it.boundsInWindow()
+                } else Modifier
+            )
+            .zIndex(if (lifted) 1f else 0f)
+            .graphicsLayer {
+                if (lifted) {
+                    translationX = reorder!!.offset.x
+                    translationY = reorder.offset.y
+                    scaleX = 1.12f
+                    scaleY = 1.12f
+                }
+            }
+    ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier
                 .fillMaxWidth()
-                .semantics {
-                    contentDescription = listOfNotNull(entry.label, subtitle, entry.profileLabel?.let { "$it profile" })
-                        .distinct().joinToString(", ")
-                }
-                .combinedClickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = null,
-                    onClick = {
-                        val r = Rect(
-                            bounds.left.toInt(), bounds.top.toInt(),
-                            bounds.right.toInt(), bounds.bottom.toInt()
-                        )
-                        val options = ActivityOptions.makeScaleUpAnimation(
-                            view, r.left, r.top, r.width(), r.height()
-                        ).toBundle()
-                        vm.launch(entry, r, options)
-                    },
-                    onLongClick = {
-                        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                        menu = true
-                    },
-                    onLongClickLabel = "App options",
-                )
+                .then(gesture)
                 .padding(vertical = 6.dp),
         ) {
             val ring = when {
-                !highlighted -> Modifier
+                !(highlighted || isTarget) -> Modifier
                 colors.sketch -> Modifier.sketchBorder(colors.gold, iconSize, seed = 5, width = 2.dp)
                 else -> Modifier.border(2.dp, colors.gold, CircleShape)
             }
-            Box(ring.padding(if (highlighted) 3.dp else 0.dp)) {
+            Box(ring.padding(if (highlighted || isTarget) 3.dp else 0.dp)) {
                 AppIcon(
                     entry, iconSize,
                     Modifier.onGloballyPositioned { bounds = it.boundsInWindow() },

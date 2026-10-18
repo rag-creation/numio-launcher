@@ -5,6 +5,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -65,6 +66,7 @@ import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.zIndex
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.rr.numio.launcher.LauncherViewModel
 import com.rr.numio.launcher.R
@@ -146,7 +148,7 @@ fun SolScreen(
             val roomForCard = maxHeight >= 700.dp
             Column(Modifier.fillMaxSize()) {
                 Spacer(Modifier.height(28.dp))
-                SolClockView(colors, now, clockStyle, onOpenClock)
+                SolClockView(colors, now, clockStyle, onOpenClock, vm::setSolClock)
                 SolToday(colors, now, showCalendar, onOpenClock, onOpenEvent)
 
                 if (!isDefault) {
@@ -174,8 +176,6 @@ fun SolScreen(
                     showCalendar = showCalendar,
                     wallpaper = wallpaper,
                     onWallpaper = vm::setSolWallpaper,
-                    clockStyle = clockStyle,
-                    onNextClock = vm::nextSolClock,
                     onToggleCalendar = onToggleCalendar,
                     onSwitchTheme = onSwitchTheme,
                     onRequestHome = onRequestHome,
@@ -195,7 +195,15 @@ fun SolScreen(
 }
 
 @Composable
-private fun SolClockView(colors: NumioColors, now: Long, style: SolClock, onOpenClock: () -> Unit) {
+private fun SolClockView(
+    colors: NumioColors,
+    now: Long,
+    style: SolClock,
+    onOpenClock: () -> Unit,
+    onPickStyle: (SolClock) -> Unit,
+) {
+    val haptics = LocalHapticFeedback.current
+    var picker by remember { mutableStateOf(false) }
     val context = LocalContext.current
     val is24 = DateFormat.is24HourFormat(context)
     val time = SimpleDateFormat(if (is24) "HH:mm" else "h:mm", Locale.ENGLISH).format(Date(now))
@@ -207,14 +215,39 @@ private fun SolClockView(colors: NumioColors, now: Long, style: SolClock, onOpen
         Modifier
             .fillMaxWidth()
             .semantics(mergeDescendants = true) { contentDescription = spoken }
-            .clickable(
+            .combinedClickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
                 role = Role.Button,
                 onClickLabel = "Open clock",
+                onLongClickLabel = "Change clock style",
+                onLongClick = {
+                    haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                    picker = true
+                },
                 onClick = onOpenClock,
             ),
     ) {
+        // Long-press the clock: pick a style, each one shown in its own numerals
+        DropdownMenu(expanded = picker, onDismissRequest = { picker = false }, offset = DpOffset(0.dp, 0.dp)) {
+            SolClock.entries.forEach { option ->
+                DropdownMenuItem(
+                    text = {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                (if (option == style) "✓  " else "     ") + option.label,
+                                modifier = Modifier.width(130.dp),
+                            )
+                            Text(
+                                "10:41",
+                                style = TextStyle(fontFamily = ClockFonts.getValue(option), fontSize = 24.sp, color = colors.ink),
+                            )
+                        }
+                    },
+                    onClick = { picker = false; onPickStyle(option) },
+                )
+            }
+        }
         // Sized in dp, not sp: the clock is already large, so it shouldn't grow with font scale.
         // Each font is a different width, so measure "00:00" and shrink until it fits.
         val density = LocalDensity.current
@@ -312,8 +345,6 @@ private fun SolMenuArea(
     showCalendar: Boolean,
     wallpaper: SolWallpaper,
     onWallpaper: (SolWallpaper) -> Unit,
-    clockStyle: SolClock,
-    onNextClock: () -> Unit,
     onToggleCalendar: () -> Unit,
     onSwitchTheme: () -> Unit,
     onRequestHome: () -> Unit,
@@ -334,11 +365,6 @@ private fun SolMenuArea(
         val at = menuAt
         Box(Modifier.offset(x = with(density) { (at?.x ?: 0f).toDp() }, y = with(density) { (at?.y ?: 0f).toDp() })) {
             DropdownMenu(expanded = at != null, onDismissRequest = { menuAt = null }, offset = DpOffset.Zero) {
-                DropdownMenuItem(
-                    text = { Text("Clock style: ${clockStyle.label}  ›") },
-                    // stays open: tap again to try the next style
-                    onClick = onNextClock,
-                )
                 DropdownMenuItem(
                     text = { Text(if (wallpaper == SolWallpaper.Garden) "✓  Garden wallpaper" else "Garden wallpaper") },
                     onClick = { menuAt = null; onWallpaper(SolWallpaper.Garden) },
@@ -374,13 +400,20 @@ private fun HomeRows(vm: LauncherViewModel, colors: NumioColors, apps: List<AppE
         )
         return
     }
+    val reorder = rememberReorder(vm::moveHome)
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        apps.chunked(5).forEach { row ->
+        apps.chunked(5).forEachIndexed { r, row ->
+            // the row holding a lifted icon is drawn on top, so the icon passes over the other row
+            val liftedHere = reorder.dragging in (r * 5) until (r * 5 + row.size)
             // five equal slots, so rows line up in columns even when a row isn't full
-            Row(Modifier.fillMaxWidth()) {
-                row.forEach { entry ->
+            Row(Modifier.fillMaxWidth().zIndex(if (liftedHere) 1f else 0f)) {
+                row.forEachIndexed { c, entry ->
                     Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
-                        AppTile(entry, vm, colors, iconSize = 56.dp, showLabel = false, modifier = Modifier.width(64.dp))
+                        AppTile(
+                            entry, vm, colors, iconSize = 56.dp, showLabel = false,
+                            modifier = Modifier.width(64.dp),
+                            reorder = reorder, index = r * 5 + c,
+                        )
                     }
                 }
                 repeat(5 - row.size) { Spacer(Modifier.weight(1f)) }
@@ -398,8 +431,13 @@ private fun SolDock(vm: LauncherViewModel, colors: NumioColors, dock: List<AppEn
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier.fillMaxWidth(),
     ) {
-        dock.forEach { entry ->
-            AppTile(entry, vm, colors, iconSize = 56.dp, showLabel = false, modifier = Modifier.width(64.dp))
+        val reorder = rememberReorder(vm::moveDock)
+        dock.forEachIndexed { i, entry ->
+            AppTile(
+                entry, vm, colors, iconSize = 56.dp, showLabel = false,
+                modifier = Modifier.width(64.dp),
+                reorder = reorder, index = i,
+            )
         }
     }
 }

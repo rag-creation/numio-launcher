@@ -74,10 +74,8 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
     val solClock: StateFlow<SolClock> =
         prefs.solClock.stateIn(viewModelScope, SharingStarted.Eagerly, SolClock.Fraunces)
 
-    /** Next clock style, round and round (the menu stays open so you can tap through them). */
-    fun nextSolClock() {
-        val all = SolClock.entries
-        viewModelScope.launch { prefs.setSolClock(all[(all.indexOf(solClock.value) + 1) % all.size]) }
+    fun setSolClock(c: SolClock) {
+        viewModelScope.launch { prefs.setSolClock(c) }
     }
 
     val background: StateFlow<Background> =
@@ -106,6 +104,22 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
             return
         }
         viewModelScope.launch { prefs.setHomeApps(current + entry.key) }
+    }
+
+    /** Drag-to-rearrange on Sol's home rows. */
+    fun moveHome(from: Int, to: Int) {
+        val keys = homeApps.value.map { it.key }.toMutableList()
+        if (from !in keys.indices || to !in keys.indices) return
+        keys.add(to, keys.removeAt(from))
+        viewModelScope.launch { prefs.setHomeApps(keys) }
+    }
+
+    /** Drag-to-rearrange in the dock. */
+    fun moveDock(from: Int, to: Int) {
+        val keys = dock.value.map { it.key }.toMutableList()
+        if (from !in keys.indices || to !in keys.indices) return
+        keys.add(to, keys.removeAt(from))
+        viewModelScope.launch { prefs.setDock(keys) }
     }
 
     fun removeFromHome(entry: AppEntry) {
