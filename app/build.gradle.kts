@@ -42,6 +42,12 @@ android {
     buildFeatures {
         compose = true
     }
+    // Gesture tests run on the JVM (Robolectric), so CI checks drag-to-rearrange for real
+    testOptions {
+        unitTests {
+            isIncludeAndroidResources = true
+        }
+    }
     dependenciesInfo {
         includeInApk = false
         includeInBundle = false
@@ -64,5 +70,10 @@ dependencies {
     implementation(libs.androidx.datastore.preferences)
 
     testImplementation(libs.junit)
+    testImplementation(libs.robolectric)
+    testImplementation(libs.androidx.test.ext.junit)
+    testImplementation(platform(libs.androidx.compose.bom))
+    testImplementation(libs.androidx.compose.ui.test.junit4)
+    debugImplementation(libs.androidx.compose.ui.test.manifest)
     debugImplementation(libs.androidx.compose.ui.tooling)
 }

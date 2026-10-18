@@ -104,9 +104,27 @@ fun AppTile(
     val description = listOfNotNull(entry.label, subtitle, entry.profileLabel?.let { "$it profile" })
         .distinct().joinToString(", ")
 
-    // Plain tiles (Shelf, Ink) keep the tested click handling on the content; rearrangeable
-    // tiles get the tap/hold/drag gesture on the outer box, which stays put while the icon moves.
-    val gesture = if (reorder == null) {
+    val isTarget = reorder != null && reorder.dragging >= 0 && reorder.target == index && reorder.dragging != index
+
+    // Plain tiles (Shelf, Ink) keep the tested click handling; home rows and dock get
+    // tap / hold / drag on a box that stays put while the icon is lifted.
+    val outer = if (reorder == null) {
+        modifier
+    } else {
+        modifier
+            .semantics {
+                contentDescription = description
+                onClick(label = "Open") { open(); true }
+                onLongClick(label = "App options") { menu = true; true }
+            }
+            .reorderSlot(
+                reorder, index, entry.key,
+                onTap = open,
+                onHoldStart = { haptics.performHapticFeedback(HapticFeedbackType.LongPress) },
+                onMenu = { menu = true },
+            )
+    }
+    val plainClick = if (reorder == null) {
         Modifier
             .semantics { contentDescription = description }
             .combinedClickable(
@@ -116,48 +134,14 @@ fun AppTile(
                 onLongClick = hold,
                 onLongClickLabel = "App options",
             )
-    } else {
-        Modifier
-            .semantics {
-                contentDescription = description
-                onClick(label = "Open") { open(); true }
-                onLongClick(label = "App options") { hold(); true }
-            }
-            .tapHoldDrag(
-                key = entry.key to index,
-                onTap = open,
-                onHold = hold,
-                onDragStart = { menu = false; reorder.start(index) },
-                onDrag = reorder::drag,
-                onDragEnd = reorder::end,
-            )
-    }
-    val lifted = reorder != null && reorder.dragging == index
-    val isTarget = reorder != null && reorder.dragging >= 0 && reorder.target == index && !lifted
+    } else Modifier
 
-    Box(
-        modifier
-            .then(
-                if (reorder != null) Modifier.onGloballyPositioned {
-                    if (reorder.dragging != index) reorder.slots[index] = it.boundsInWindow()
-                } else Modifier
-            )
-            .then(if (reorder != null) gesture else Modifier)
-            .zIndex(if (lifted) 1f else 0f)
-            .graphicsLayer {
-                if (lifted) {
-                    translationX = reorder!!.offset.x
-                    translationY = reorder.offset.y
-                    scaleX = 1.12f
-                    scaleY = 1.12f
-                }
-            }
-    ) {
+    Box(outer) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier
                 .fillMaxWidth()
-                .then(if (reorder == null) gesture else Modifier)
+                .then(plainClick)
                 .padding(vertical = 6.dp),
         ) {
             val ring = when {
