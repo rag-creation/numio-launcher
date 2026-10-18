@@ -68,12 +68,13 @@ import com.rr.numio.launcher.LauncherViewModel
 import com.rr.numio.launcher.R
 import com.rr.numio.launcher.ShelfMode
 import com.rr.numio.launcher.data.AppEntry
+import com.rr.numio.launcher.data.SolWallpaper
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-/** Light display numerals for Sol's clock (Inter Display Light, digits and colon only). */
-private val SolClockFont = FontFamily(Font(R.font.inter_display_light, FontWeight.Light))
+/** Sol's big clock: Fraunces Bold, a soft editorial serif (digits and colon only). */
+private val SolClockFont = FontFamily(Font(R.font.fraunces_bold, FontWeight.Bold))
 
 /**
  * Numio Sol home: the Petal wallpaper does the work. Date and a large light clock in the
@@ -95,6 +96,7 @@ fun SolScreen(
     val dock by vm.dock.collectAsStateWithLifecycle()
     val isDefault by vm.isDefaultHome.collectAsStateWithLifecycle()
     val showCalendar by vm.showCalendar.collectAsStateWithLifecycle()
+    val wallpaper by vm.solWallpaper.collectAsStateWithLifecycle()
     val swipe = with(LocalDensity.current) { 56.dp.toPx() }
     val now = rememberNow()
 
@@ -113,7 +115,9 @@ fun SolScreen(
     ) {
         // The wallpaper fills the screen; on shorter or wider screens it trims mostly from the sky
         Image(
-            bitmap = ImageBitmap.imageResource(R.drawable.sol_wallpaper),
+            bitmap = ImageBitmap.imageResource(
+                if (wallpaper == SolWallpaper.Petal) R.drawable.sol_petal else R.drawable.sol_garden
+            ),
             contentDescription = null,
             contentScale = ContentScale.Crop,
             alignment = BiasAlignment(0f, 0.4f),
@@ -204,7 +208,7 @@ private fun SolClock(colors: NumioColors, now: Long, onOpenClock: () -> Unit) {
                 style = TextStyle(
                     color = colors.ink,
                     fontFamily = SolClockFont,
-                    fontWeight = FontWeight.Light,
+                    fontWeight = FontWeight.Bold,
                     fontSize = clockSp,
                     lineHeight = clockSp,
                     letterSpacing = (-0.02).em,

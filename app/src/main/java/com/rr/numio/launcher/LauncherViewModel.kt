@@ -10,6 +10,7 @@ import com.rr.numio.launcher.data.Background
 import com.rr.numio.launcher.data.DefaultDock
 import com.rr.numio.launcher.data.HomePrefs
 import com.rr.numio.launcher.data.HomeTheme
+import com.rr.numio.launcher.data.SolWallpaper
 import com.rr.numio.launcher.data.TodaySource
 import com.rr.numio.launcher.search.AppSearch
 import kotlinx.coroutines.Dispatchers
@@ -60,6 +61,13 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
     /** Switching only changes the look; the dock, apps and other settings stay as they are. */
     fun setTheme(theme: HomeTheme) {
         viewModelScope.launch { prefs.setTheme(theme) }
+    }
+
+    val solWallpaper: StateFlow<SolWallpaper> =
+        prefs.solWallpaper.stateIn(viewModelScope, SharingStarted.Eagerly, SolWallpaper.Garden)
+
+    fun setSolWallpaper(w: SolWallpaper) {
+        viewModelScope.launch { prefs.setSolWallpaper(w) }
     }
 
     val background: StateFlow<Background> =

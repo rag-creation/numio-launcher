@@ -18,7 +18,7 @@ Every icon is drawn in the Numio **Sketch** style (wobbly ink on warm paper, wit
 
 **Two looks: Ink and Sol**
 - **Ink** (the default): dark or cream paper, hand-drawn sketch icons and clock
-- **Sol**: an original cut-paper wallpaper (terracotta petal, sage leaf, blue stone, a small sun) on warm cream, a light clock, and your apps' real icons
+- **Sol**: warm cream with one of two original wallpapers, Garden (painted: a dabbed sun, a cross-hatched stone, a gouache hill, a dry-brush sweep) or Petal (cut paper), a big serif clock, a month calendar, home rows and themed icons
 - Switch from the long-press menu on the home screen. Your dock and apps stay exactly as they are
 
 **Shelf: all your apps**
@@ -48,8 +48,8 @@ Kotlin, Jetpack Compose and DataStore. Uses Android's own LauncherApps and RoleM
 
 ## Fonts
 
-Sol's clock uses [Inter Display](https://github.com/rsms/inter) by The Inter Project Authors,
-licensed under the SIL Open Font License 1.1 (see `licenses/Inter-OFL.txt`).
+Sol's clock uses [Fraunces](https://github.com/undercasetype/Fraunces) by Undercase Type,
+licensed under the SIL Open Font License 1.1 (see `licenses/OFL-Fraunces.txt`), subset to digits.
 
 ## License
 

@@ -15,6 +15,9 @@ enum class Background { Paper, Wallpaper }
 /** The two home screen designs. Both share the same apps, dock, Shelf and settings. */
 enum class HomeTheme { Ink, Sol }
 
+/** Sol's two wallpapers: Garden (painted, the default) and Petal (cut paper). */
+enum class SolWallpaper { Garden, Petal }
+
 /** Home screen settings that must survive restarts: the dock and the background. */
 class HomePrefs(context: Context) {
 
@@ -35,6 +38,14 @@ class HomePrefs(context: Context) {
 
     suspend fun setTheme(theme: HomeTheme) {
         store.edit { it[THEME] = if (theme == HomeTheme.Sol) "sol" else "ink" }
+    }
+
+    val solWallpaper: Flow<SolWallpaper> = store.data.map { p ->
+        if (p[SOL_WALLPAPER] == "petal") SolWallpaper.Petal else SolWallpaper.Garden
+    }
+
+    suspend fun setSolWallpaper(w: SolWallpaper) {
+        store.edit { it[SOL_WALLPAPER] = if (w == SolWallpaper.Petal) "petal" else "garden" }
     }
 
     /** Show the next calendar event on the Today line. Off until the user turns it on. */
@@ -58,5 +69,6 @@ class HomePrefs(context: Context) {
         private val BACKGROUND = stringPreferencesKey("background")
         private val SHOW_CALENDAR = booleanPreferencesKey("show_calendar")
         private val THEME = stringPreferencesKey("theme")
+        private val SOL_WALLPAPER = stringPreferencesKey("sol_wallpaper")
     }
 }
