@@ -15,7 +15,8 @@ import kotlinx.coroutines.withContext
 /**
  * Sol's icons: the app's own monochrome (themed) symbol in deep olive on a soft sage or
  * cream circle, so the whole screen reads as one palette. Apps without a usable
- * monochrome layer get the first letter of their name in the same style.
+ * monochrome layer get a one-colour symbol made from their normal icon, and only if
+ * that fails, the first letter of their name.
  * Second-profile apps get a gold badge.
  */
 object ThemedIcons {
@@ -58,7 +59,9 @@ object ThemedIcons {
             setShadowLayer(px * 0.035f, 0f, px * 0.02f, SHADOW)
         })
 
+        // 1) the app's own monochrome icon, 2) a symbol made from its normal icon, 3) a letter
         val mono = MonoLayer.of(entry)?.let { MonoLayer.inked(it, px, cx, r, OLIVE) }
+            ?: MonoLayer.derived(entry, px, cx, r, OLIVE)
         if (mono != null) {
             // the layer was drawn centred on cx; nudge it up with the circle
             c.drawBitmap(mono, 0f, cy - cx, null)
