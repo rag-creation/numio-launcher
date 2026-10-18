@@ -185,7 +185,7 @@ private fun rememberNow(): Long {
 private fun clockTime(context: Context, t: Long, now: Long): String {
     val is24 = DateFormat.is24HourFormat(context)
     val time = SimpleDateFormat(if (is24) "HH:mm" else "h:mm a", Locale.ENGLISH).format(Date(t)).lowercase(Locale.ENGLISH)
-    return if (sameDay(t, now)) time else "tmrw $time"
+    return if (sameDay(t, now)) time else "$time tomorrow"
 }
 
 private fun sameDay(a: Long, b: Long): Boolean {
