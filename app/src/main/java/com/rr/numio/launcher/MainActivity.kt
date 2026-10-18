@@ -20,6 +20,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -37,9 +38,12 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.core.view.WindowCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.rr.numio.launcher.data.Background
+import com.rr.numio.launcher.data.HomeTheme
 import com.rr.numio.launcher.ui.CanvasScreen
 import com.rr.numio.launcher.ui.NumioTheme
 import com.rr.numio.launcher.ui.ShelfScreen
+import com.rr.numio.launcher.ui.SolColors
+import com.rr.numio.launcher.ui.SolScreen
 import com.rr.numio.launcher.ui.homeColors
 import com.rr.numio.launcher.ui.paperColors
 
@@ -71,30 +75,39 @@ class MainActivity : ComponentActivity() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) window.isNavigationBarContrastEnforced = false
 
         setContent {
-            val bg by vm.background.collectAsStateWithLifecycle()
-            val shelf by vm.shelf.collectAsStateWithLifecycle()
-            val dark = isSystemInDarkTheme()
-            val home = homeColors(bg, dark)
-            val paper = paperColors(dark)
-
-            // Dark status bar icons only on light paper
-            val shelfOpen = shelf != ShelfMode.Closed
-            val lightBars = !dark && (shelfOpen || bg == Background.Paper)
-            SideEffect {
-                WindowCompat.getInsetsController(window, window.decorView).run {
-                    isAppearanceLightStatusBars = lightBars
-                    isAppearanceLightNavigationBars = lightBars
-                }
-            }
-
-            NumioTheme(home, paper, dark) {
-                LauncherRoot(vm, shelf)
-            }
+            // Nothing until the saved theme is known (a few ms at cold start), so Ink never flashes before Sol
+            val savedTheme by vm.theme.collectAsStateWithLifecycle()
+            savedTheme?.let { theme -> Home(theme) }
         }
     }
 
     @Composable
-    private fun LauncherRoot(vm: LauncherViewModel, shelf: ShelfMode) {
+    private fun Home(theme: HomeTheme) {
+        val bg by vm.background.collectAsStateWithLifecycle()
+        val shelf by vm.shelf.collectAsStateWithLifecycle()
+        val dark = isSystemInDarkTheme()
+        val sol = theme == HomeTheme.Sol
+        // Sol is always light, to sit on its cream wallpaper; Ink follows the system
+        val home = if (sol) SolColors else homeColors(bg, dark)
+        val paper = if (sol) SolColors else paperColors(dark)
+
+        // Dark status bar icons only on light paper
+        val shelfOpen = shelf != ShelfMode.Closed
+        val lightBars = sol || (!dark && (shelfOpen || bg == Background.Paper))
+        SideEffect {
+            WindowCompat.getInsetsController(window, window.decorView).run {
+                isAppearanceLightStatusBars = lightBars
+                isAppearanceLightNavigationBars = lightBars
+            }
+        }
+
+        NumioTheme(home, paper, dark && !sol) {
+            LauncherRoot(vm, shelf, theme)
+        }
+    }
+
+    @Composable
+    private fun LauncherRoot(vm: LauncherViewModel, shelf: ShelfMode, theme: HomeTheme) {
         // Back on the home screen does nothing (the Shelf has its own Back)
         BackHandler { }
 
@@ -104,19 +117,38 @@ class MainActivity : ComponentActivity() {
         val canvasAlpha by animateFloatAsState(if (open) 0f else 1f, tween(220), label = "canvasAlpha")
 
         Box(Modifier.fillMaxSize()) {
-            CanvasScreen(
-                vm = vm,
-                onRequestHome = ::requestHome,
-                onOpenClock = ::openClock,
-                onOpenLauncherInfo = ::openLauncherInfo,
-                onToggleCalendar = ::toggleCalendar,
-                onOpenEvent = ::openEvent,
+            // Ink or Sol: a soft crossfade when switching; the apps underneath are the same
+            Crossfade(
+                targetState = theme,
+                animationSpec = tween(350),
+                label = "homeTheme",
                 modifier = Modifier.graphicsLayer {
                     scaleX = canvasScale
                     scaleY = canvasScale
                     alpha = canvasAlpha
                 },
-            )
+            ) { t ->
+                when (t) {
+                    HomeTheme.Ink -> CanvasScreen(
+                        vm = vm,
+                        onRequestHome = ::requestHome,
+                        onOpenClock = ::openClock,
+                        onOpenLauncherInfo = ::openLauncherInfo,
+                        onToggleCalendar = ::toggleCalendar,
+                        onOpenEvent = ::openEvent,
+                        onSwitchTheme = { vm.setTheme(HomeTheme.Sol) },
+                    )
+                    HomeTheme.Sol -> SolScreen(
+                        vm = vm,
+                        onRequestHome = ::requestHome,
+                        onOpenClock = ::openClock,
+                        onOpenLauncherInfo = ::openLauncherInfo,
+                        onToggleCalendar = ::toggleCalendar,
+                        onOpenEvent = ::openEvent,
+                        onSwitchTheme = { vm.setTheme(HomeTheme.Ink) },
+                    )
+                }
+            }
             AnimatedVisibility(
                 visible = open,
                 enter = slideInVertically(tween(260)) { it / 8 } + fadeIn(tween(200)),

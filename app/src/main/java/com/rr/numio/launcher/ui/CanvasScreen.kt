@@ -91,6 +91,7 @@ fun CanvasScreen(
     onOpenLauncherInfo: () -> Unit,
     onToggleCalendar: () -> Unit,
     onOpenEvent: (id: Long, begin: Long) -> Unit,
+    onSwitchTheme: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val colors = LocalHome.current
@@ -140,6 +141,7 @@ fun CanvasScreen(
                 showCalendar = showCalendar,
                 onBackground = vm::setBackground,
                 onToggleCalendar = onToggleCalendar,
+                onSwitchTheme = onSwitchTheme,
                 onRequestHome = onRequestHome,
                 onLauncherInfo = onOpenLauncherInfo,
                 modifier = Modifier.weight(1f).fillMaxWidth(),
@@ -160,7 +162,7 @@ fun CanvasScreen(
  * changes. Only while the home screen is visible, so it costs nothing in the background.
  */
 @Composable
-private fun rememberNow(): Long {
+internal fun rememberNow(): Long {
     val context = LocalContext.current
     var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
     LifecycleStartEffect(context) {
@@ -182,7 +184,7 @@ private fun rememberNow(): Long {
     return now
 }
 
-private fun clockTime(context: Context, t: Long, now: Long): String {
+internal fun clockTime(context: Context, t: Long, now: Long): String {
     val is24 = DateFormat.is24HourFormat(context)
     val time = SimpleDateFormat(if (is24) "HH:mm" else "h:mm a", Locale.ENGLISH).format(Date(t)).lowercase(Locale.ENGLISH)
     return if (sameDay(t, now)) time else "$time tomorrow"
@@ -293,6 +295,17 @@ private fun DayStroke(date: String, dateH: Dp, now: Long, gold: Color) {
     }
 }
 
+/** The real next alarm (within a day) and, if turned on and allowed, the next event. Shared by Ink and Sol. */
+@Composable
+internal fun rememberToday(now: Long, showCalendar: Boolean): Pair<Long?, TodaySource.NextEvent?> {
+    val context = LocalContext.current
+    val alarm = remember(now) { TodaySource.nextAlarm(context, now) }
+    val event by produceState<TodaySource.NextEvent?>(null, now, showCalendar) {
+        value = if (showCalendar) withContext(Dispatchers.IO) { TodaySource.nextEvent(context, now) } else null
+    }
+    return alarm to event
+}
+
 /** "alarm 6:30 am · Dentist 4:30 pm". Each part only when real; the line hides when both are empty. */
 @Composable
 private fun TodayLine(
@@ -303,10 +316,7 @@ private fun TodayLine(
     onOpenEvent: (Long, Long) -> Unit,
 ) {
     val context = LocalContext.current
-    val alarm = remember(now) { TodaySource.nextAlarm(context, now) }
-    val event by produceState<TodaySource.NextEvent?>(null, now, showCalendar) {
-        value = if (showCalendar) withContext(Dispatchers.IO) { TodaySource.nextEvent(context, now) } else null
-    }
+    val (alarm, event) = rememberToday(now, showCalendar)
     if (alarm == null && event == null) return
 
     val style = TextStyle(
@@ -372,6 +382,7 @@ private fun CanvasMenuArea(
     showCalendar: Boolean,
     onBackground: (Background) -> Unit,
     onToggleCalendar: () -> Unit,
+    onSwitchTheme: () -> Unit,
     onRequestHome: () -> Unit,
     onLauncherInfo: () -> Unit,
     modifier: Modifier,
@@ -413,6 +424,7 @@ private fun CanvasMenuArea(
                     text = { Text(tick(showCalendar, "Show next calendar event")) },
                     onClick = { menuAt = null; onToggleCalendar() },
                 )
+                DropdownMenuItem(text = { Text("Switch to Sol theme") }, onClick = { menuAt = null; onSwitchTheme() })
                 if (!isDefault) {
                     DropdownMenuItem(text = { Text("Set as home screen") }, onClick = { menuAt = null; onRequestHome() })
                 }

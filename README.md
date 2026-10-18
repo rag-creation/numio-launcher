@@ -16,6 +16,11 @@ Every icon is drawn in the Numio **Sketch** style (wobbly ink on warm paper, wit
 - Paper background, or your own wallpaper with white ink
 - Long-press the empty space for home options
 
+**Two looks: Ink and Sol**
+- **Ink** (the default): dark or cream paper, hand-drawn sketch icons and clock
+- **Sol**: an original cut-paper wallpaper (terracotta petal, sage leaf, blue stone, a small sun) on warm cream, a light clock, and your apps' real icons
+- Switch from the long-press menu on the home screen. Your dock and apps stay exactly as they are
+
 **Shelf: all your apps**
 - Swipe up anywhere to see every app A–Z, with hand-drawn letter headings
 - Search bar at the bottom, near your thumb. Tap the search pill on the home screen and start typing; Enter opens the top result
@@ -40,6 +45,11 @@ Keep One UI Home installed. Samsung's Recents screen and gesture animations come
 ## Built with
 
 Kotlin, Jetpack Compose and DataStore. Uses Android's own LauncherApps and RoleManager.
+
+## Fonts
+
+Sol's clock uses [Inter Display](https://github.com/rsms/inter) by The Inter Project Authors,
+licensed under the SIL Open Font License 1.1 (see `licenses/Inter-OFL.txt`).
 
 ## License
 

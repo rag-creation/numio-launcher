@@ -53,8 +53,9 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
         combine(showCalendarPref, _calendarAccess) { on, access -> on && access }
             .stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
-    val theme: StateFlow<HomeTheme> =
-        prefs.theme.stateIn(viewModelScope, SharingStarted.Eagerly, HomeTheme.Ink)
+    /** null for the first few milliseconds, until the saved choice is read (so Ink never flashes before Sol). */
+    val theme: StateFlow<HomeTheme?> =
+        prefs.theme.stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
     /** Switching only changes the look; the dock, apps and other settings stay as they are. */
     fun setTheme(theme: HomeTheme) {
