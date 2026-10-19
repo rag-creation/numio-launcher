@@ -49,6 +49,21 @@ class HomePrefs(context: Context) {
         store.edit { it[HOME_APPS] = cells.joinToString("\n") { k -> k.orEmpty() } }
     }
 
+    /** Sol's home grid (see [HomeGrid.serialize]); null until it's first changed. */
+    val solGrid: Flow<String?> = store.data.map { p -> p[SOL_GRID] }
+
+    suspend fun setSolGrid(text: String?) {
+        store.edit { if (text == null) it.remove(SOL_GRID) else it[SOL_GRID] = text }
+    }
+
+    /** Grid and dock in one save, so a move between them is never half done. */
+    suspend fun setGridAndDock(grid: String, dock: List<String?>) {
+        store.edit {
+            it[SOL_GRID] = grid
+            it[DOCK] = dock.joinToString("\n") { k -> k.orEmpty() }
+        }
+    }
+
     /** Home and dock in one save, so a move between them is never half done. */
     suspend fun setCells(home: List<String?>, dock: List<String?>) {
         store.edit {
@@ -106,5 +121,6 @@ class HomePrefs(context: Context) {
         private val SOL_WALLPAPER = stringPreferencesKey("sol_wallpaper")
         private val HOME_APPS = stringPreferencesKey("home_apps")
         private val SOL_CLOCK = stringPreferencesKey("sol_clock")
+        private val SOL_GRID = stringPreferencesKey("sol_grid")
     }
 }

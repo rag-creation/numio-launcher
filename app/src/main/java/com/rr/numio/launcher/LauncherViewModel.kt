@@ -9,6 +9,8 @@ import com.rr.numio.launcher.data.AppRepository
 import com.rr.numio.launcher.data.Background
 import com.rr.numio.launcher.data.Cells
 import com.rr.numio.launcher.data.DefaultDock
+import com.rr.numio.launcher.data.GridItem
+import com.rr.numio.launcher.data.HomeGrid
 import com.rr.numio.launcher.data.Slot
 import com.rr.numio.launcher.data.HomePrefs
 import com.rr.numio.launcher.data.HomeTheme
@@ -98,32 +100,66 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
     val dock: StateFlow<List<AppEntry>> =
         dockCells.map { it.filterNotNull() }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
-    /** Sol's home: two rows of five fixed cells. */
-    val homeCells: StateFlow<List<AppEntry?>> = cellsOf(prefs.homeApps, HomePrefs.HOME_MAX)
+    /** Rows the home grid has on this screen; set by the screen once it's measured. */
+    private val gridRows = MutableStateFlow(8)
+
+    fun setGridRows(rows: Int) {
+        gridRows.value = rows
+    }
+
+    /** Every installed app by key, for drawing the grid. */
+    val appsByKey: StateFlow<Map<String, AppEntry>> =
+        repo.apps.filterNotNull().map { list -> list.associateBy { it.key } }
+            .stateIn(viewModelScope, SharingStarted.Eagerly, emptyMap())
+
+    /** Sol's home grid, always valid for the current screen (see [HomeGrid.normalize]). */
+    val gridItems: StateFlow<List<GridItem>> =
+        combine(appsByKey, prefs.solGrid, prefs.homeApps, gridRows) { apps, saved, legacy, rows ->
+            val items = if (saved != null) HomeGrid.parse(saved)
+            else HomeGrid.fromLegacy(Cells.pad(legacy, HomePrefs.HOME_MAX), rows)
+            HomeGrid.normalize(items, rows, apps.keys)
+        }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     private fun keys(cells: List<AppEntry?>) = cells.map { it?.key }
 
-    fun isOnHome(entry: AppEntry) = homeCells.value.any { it?.key == entry.key }
+    private fun saveGrid(items: List<GridItem>) {
+        viewModelScope.launch { prefs.setSolGrid(HomeGrid.serialize(items)) }
+    }
+
+    fun isOnHome(entry: AppEntry) = gridItems.value.any { it.id == entry.key }
 
     fun addToHome(entry: AppEntry) {
-        val cells = keys(homeCells.value)
-        if (entry.key in cells) return
-        val i = Cells.firstEmpty(cells)
-        if (i < 0) {
+        val items = gridItems.value
+        if (items.any { it.id == entry.key }) return
+        val spot = HomeGrid.firstFree(items, gridRows.value)
+        if (spot == null) {
             Toast.makeText(getApplication(), "Home is full. Remove an app first", Toast.LENGTH_SHORT).show()
             return
         }
-        viewModelScope.launch { prefs.setHomeApps(cells.toMutableList().also { it[i] = entry.key }) }
+        saveGrid(items + GridItem(entry.key, spot.first, spot.second, 1, 1))
     }
 
     fun removeFromHome(entry: AppEntry) {
-        viewModelScope.launch { prefs.setHomeApps(keys(homeCells.value).map { if (it == entry.key) null else it }) }
+        saveGrid(gridItems.value.filter { it.id != entry.key })
     }
 
-    /** Drag on Sol's home or dock: into an empty cell it moves, onto an app they swap. */
+    /** Can [from] be dropped on [to]? Used while dragging, to show only real drop spots. */
+    fun canDrop(from: Slot, to: Slot): Boolean =
+        HomeGrid.move(gridItems.value, keys(dockCells.value), gridRows.value, from, to) != null
+
+    /** Drag on Sol's home or dock. Widgets go into free space; apps move or swap, grid ↔ dock too. */
     fun drop(from: Slot, to: Slot) {
-        val (home, dock) = Cells.move(keys(homeCells.value), keys(dockCells.value), from, to)
-        viewModelScope.launch { prefs.setCells(home, dock) }
+        val (grid, dock) = HomeGrid.move(gridItems.value, keys(dockCells.value), gridRows.value, from, to) ?: return
+        viewModelScope.launch { prefs.setGridAndDock(HomeGrid.serialize(grid), dock) }
+    }
+
+    /** Widgets back to the top, apps onto the bottom rows in reading order. */
+    fun resetHomeLayout() {
+        val apps = gridItems.value.filter { !it.isWidget }.sortedWith(compareBy({ it.row }, { it.col })).map { it.id }
+        val rows = gridRows.value
+        val first = HomeGrid.fromLegacy(apps.take(HomePrefs.HOME_MAX), rows)
+        val rest = apps.drop(HomePrefs.HOME_MAX).map { GridItem(it, -1, -1, 1, 1) }
+        saveGrid(HomeGrid.normalize(first + rest, rows, appsByKey.value.keys))
     }
 
     /** Search results; with no query, every app A–Z. */

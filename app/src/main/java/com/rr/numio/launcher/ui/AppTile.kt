@@ -87,6 +87,8 @@ fun AppTile(
     /** Set for icons in Sol's home or dock cells: hold and move to drag them to another cell. */
     placement: Placement? = null,
     slot: Slot? = null,
+    /** False on the home grid, which reports its cell rects itself. */
+    registerSlot: Boolean = true,
 ) {
     val view = LocalView.current
     val haptics = LocalHapticFeedback.current
@@ -123,6 +125,7 @@ fun AppTile(
                 onTap = open,
                 onHoldStart = { haptics.performHapticFeedback(HapticFeedbackType.LongPress) },
                 onMenu = { menu = true },
+                register = registerSlot,
             )
     }
     val plainClick = if (placement == null) {

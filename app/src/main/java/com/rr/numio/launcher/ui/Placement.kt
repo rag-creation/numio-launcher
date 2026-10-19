@@ -24,7 +24,11 @@ import com.rr.numio.launcher.data.Slot
  * Every cell reports where it sits; while an app is dragged, the cell nearest the finger is
  * the drop target, unless the finger is far from every cell (then nothing moves).
  */
-class Placement(private val onDrop: (from: Slot, to: Slot) -> Unit) {
+class Placement(
+    private val onDrop: (from: Slot, to: Slot) -> Unit,
+    /** Is this a real drop spot for what's being dragged? Others never light up. */
+    private val canDrop: (from: Slot, to: Slot) -> Boolean = { _, _ -> true },
+) {
     /** Where each cell sits on screen. Plain map: only read during a drag. */
     val slots = HashMap<Slot, Rect>()
 
@@ -49,7 +53,8 @@ class Placement(private val onDrop: (from: Slot, to: Slot) -> Unit) {
         val finger = home.center + total
         val nearest = slots.minByOrNull { (it.value.center - finger).getDistance() } ?: return
         val reach = maxOf(nearest.value.width, nearest.value.height) * 1.2f
-        target = if ((nearest.value.center - finger).getDistance() <= reach) nearest.key else from
+        val close = (nearest.value.center - finger).getDistance() <= reach
+        target = if (close && nearest.key != from && canDrop(from, nearest.key)) nearest.key else from
     }
 
     /** Held but not moved: put it back without changing anything. */
@@ -71,9 +76,13 @@ class Placement(private val onDrop: (from: Slot, to: Slot) -> Unit) {
 }
 
 @Composable
-fun rememberPlacement(onDrop: (from: Slot, to: Slot) -> Unit): Placement {
-    val latest by rememberUpdatedState(onDrop)
-    return remember { Placement { a, b -> latest(a, b) } }
+fun rememberPlacement(
+    onDrop: (from: Slot, to: Slot) -> Unit,
+    canDrop: (from: Slot, to: Slot) -> Boolean = { _, _ -> true },
+): Placement {
+    val latestDrop by rememberUpdatedState(onDrop)
+    val latestCan by rememberUpdatedState(canDrop)
+    return remember { Placement({ a, b -> latestDrop(a, b) }, { a, b -> latestCan(a, b) }) }
 }
 
 /** An empty cell: nothing to drag, but apps can be dropped on it. */
@@ -95,8 +104,14 @@ fun Modifier.appCell(
     onTap: () -> Unit,
     onHoldStart: () -> Unit,
     onMenu: () -> Unit,
+    /** False when the grid reports the cell rects itself (widgets span many cells). */
+    register: Boolean = true,
 ): Modifier = this
-    .onGloballyPositioned { if (placement.dragging != slot) placement.slots[slot] = it.boundsInWindow() }
+    .then(
+        if (register) Modifier.onGloballyPositioned {
+            if (placement.dragging != slot) placement.slots[slot] = it.boundsInWindow()
+        } else Modifier
+    )
     .tapHoldDrag(
         key = key to slot,
         onTap = onTap,

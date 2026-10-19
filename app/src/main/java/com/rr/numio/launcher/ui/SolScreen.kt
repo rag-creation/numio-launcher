@@ -37,12 +37,17 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.BiasAlignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.onLongClick
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
@@ -74,6 +79,8 @@ import com.rr.numio.launcher.R
 import com.rr.numio.launcher.ShelfMode
 import com.rr.numio.launcher.data.AppEntry
 import com.rr.numio.launcher.data.Slot
+import com.rr.numio.launcher.data.HomeGrid
+import com.rr.numio.launcher.data.GridItem
 import com.rr.numio.launcher.data.SolClock
 import com.rr.numio.launcher.data.SolWallpaper
 import java.text.SimpleDateFormat
@@ -106,10 +113,11 @@ fun SolScreen(
     modifier: Modifier = Modifier,
 ) {
     val colors = SolColors
-    val homeCells by vm.homeCells.collectAsStateWithLifecycle()
+    val gridItems by vm.gridItems.collectAsStateWithLifecycle()
+    val appsByKey by vm.appsByKey.collectAsStateWithLifecycle()
     val dockCells by vm.dockCells.collectAsStateWithLifecycle()
-    // One drag-and-drop for home and dock, so apps can move between them
-    val placement = rememberPlacement(vm::drop)
+    // One drag-and-drop for the home grid and the dock, so apps can move between them
+    val placement = rememberPlacement(vm::drop, vm::canDrop)
     val haptics = LocalHapticFeedback.current
     LaunchedEffect(placement.target) {
         if (placement.dragging != null && placement.target != placement.dragging) {
@@ -146,7 +154,7 @@ fun SolScreen(
             alignment = BiasAlignment(0f, 0.4f),
             modifier = Modifier.fillMaxSize(),
         )
-        BoxWithConstraints(
+        Column(
             Modifier
                 .fillMaxSize()
                 .statusBarsPadding()
@@ -154,59 +162,279 @@ fun SolScreen(
                 .windowInsetsPadding(WindowInsets.displayCutout.only(WindowInsetsSides.Horizontal))
                 .padding(horizontal = 24.dp),
         ) {
-            // On short screens the month card steps aside so the apps never get squeezed
-            val roomForCard = maxHeight >= 700.dp
-            Column(Modifier.fillMaxSize()) {
-                Spacer(Modifier.height(28.dp))
-                SolClockView(colors, now, clockStyle, onOpenClock, vm::setSolClock)
-                SolToday(colors, now, showCalendar, onOpenClock, onOpenEvent)
-
-                if (!isDefault) {
-                    Spacer(Modifier.height(16.dp))
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .background(colors.card.copy(alpha = 0.92f), RoundedCornerShape(18.dp))
-                            .border(1.dp, colors.gold, RoundedCornerShape(18.dp))
-                            .clickable(onClick = onRequestHome)
-                            .padding(horizontal = 16.dp, vertical = 14.dp),
-                    ) {
-                        Text("Make Numio your home screen", style = TextStyle(color = colors.ink, fontSize = 15.sp), modifier = Modifier.weight(1f))
-                        Text("Set", style = TextStyle(color = colors.ink, fontSize = 15.sp, fontWeight = FontWeight.SemiBold))
-                    }
-                } else if (roomForCard) {
-                    Spacer(Modifier.height(18.dp))
-                    MonthCard(now, showCalendar, onOpenCalendar, Modifier.fillMaxWidth(0.6f))
+            Spacer(Modifier.height(16.dp))
+            if (!isDefault) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(colors.card.copy(alpha = 0.92f), RoundedCornerShape(18.dp))
+                        .border(1.dp, colors.gold, RoundedCornerShape(18.dp))
+                        .clickable(onClick = onRequestHome)
+                        .padding(horizontal = 16.dp, vertical = 14.dp),
+                ) {
+                    Text("Make Numio your home screen", style = TextStyle(color = colors.ink, fontSize = 15.sp), modifier = Modifier.weight(1f))
+                    Text("Set", style = TextStyle(color = colors.ink, fontSize = 15.sp, fontWeight = FontWeight.SemiBold))
                 }
-
-                SolMenuArea(
-                    colors = colors,
-                    isDefault = isDefault,
-                    showCalendar = showCalendar,
-                    wallpaper = wallpaper,
-                    onWallpaper = vm::setSolWallpaper,
-                    onToggleCalendar = onToggleCalendar,
-                    onSwitchTheme = onSwitchTheme,
-                    onRequestHome = onRequestHome,
-                    onLauncherInfo = onOpenLauncherInfo,
-                    modifier = Modifier.weight(1f).fillMaxWidth(),
-                )
-
-                // whichever group holds the lifted app is drawn on top, so it passes over the other
-                HomeGrid(
-                    vm, colors, homeCells, placement,
-                    Modifier.zIndex(if (placement.dragging?.area == Slot.HOME) 1f else 0f),
-                )
-                Spacer(Modifier.height(14.dp))
-                SolDock(
-                    vm, colors, dockCells, placement,
-                    Modifier.zIndex(if (placement.dragging?.area == Slot.DOCK) 1f else 0f),
-                )
-                Spacer(Modifier.height(16.dp))
-                SolSearchPill(colors) { vm.openShelf(ShelfMode.Search) }
-                Spacer(Modifier.height(14.dp))
+                Spacer(Modifier.height(12.dp))
             }
+
+            // The home grid: clock, alarm chip, calendar and apps, all movable.
+            // Whichever group holds the lifted item is drawn on top, so it passes over the other.
+            SolHomeGrid(
+                vm = vm,
+                colors = colors,
+                items = gridItems,
+                apps = appsByKey,
+                placement = placement,
+                now = now,
+                clockStyle = clockStyle,
+                showCalendar = showCalendar,
+                onOpenClock = onOpenClock,
+                onOpenEvent = onOpenEvent,
+                onOpenCalendar = onOpenCalendar,
+                menuItems = { close ->
+                    fun tick(on: Boolean, label: String) = if (on) "✓  $label" else label
+                    DropdownMenuItem(
+                        text = { Text(tick(wallpaper == SolWallpaper.Garden, "Garden wallpaper")) },
+                        onClick = { close(); vm.setSolWallpaper(SolWallpaper.Garden) },
+                    )
+                    DropdownMenuItem(
+                        text = { Text(tick(wallpaper == SolWallpaper.Petal, "Petal wallpaper")) },
+                        onClick = { close(); vm.setSolWallpaper(SolWallpaper.Petal) },
+                    )
+                    DropdownMenuItem(
+                        text = { Text(tick(showCalendar, "Show next calendar event")) },
+                        onClick = { close(); onToggleCalendar() },
+                    )
+                    DropdownMenuItem(text = { Text("Reset home layout") }, onClick = { close(); vm.resetHomeLayout() })
+                    DropdownMenuItem(text = { Text("Switch to Ink theme") }, onClick = { close(); onSwitchTheme() })
+                    if (!isDefault) {
+                        DropdownMenuItem(text = { Text("Set as home screen") }, onClick = { close(); onRequestHome() })
+                    }
+                    DropdownMenuItem(text = { Text("Launcher app info") }, onClick = { close(); onOpenLauncherInfo() })
+                },
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .zIndex(if (placement.dragging?.area == Slot.HOME) 1f else 0f),
+            )
+            Spacer(Modifier.height(10.dp))
+            SolDock(
+                vm, colors, dockCells, placement,
+                Modifier.zIndex(if (placement.dragging?.area == Slot.DOCK) 1f else 0f),
+            )
+            Spacer(Modifier.height(16.dp))
+            SolSearchPill(colors) { vm.openShelf(ShelfMode.Search) }
+            Spacer(Modifier.height(14.dp))
+        }
+    }
+}
+
+/**
+ * Sol's home grid: [HomeGrid.COLS] columns, as many ~80dp rows as fit. Items sit at their
+ * cells; empty cells take drops and open the home menu on long-press. While something is
+ * dragged, its landing spot is outlined in gold (only where it's allowed to go).
+ */
+@Composable
+private fun SolHomeGrid(
+    vm: LauncherViewModel,
+    colors: NumioColors,
+    items: List<GridItem>,
+    apps: Map<String, AppEntry>,
+    placement: Placement,
+    now: Long,
+    clockStyle: SolClock,
+    showCalendar: Boolean,
+    onOpenClock: () -> Unit,
+    onOpenEvent: (Long, Long) -> Unit,
+    onOpenCalendar: () -> Unit,
+    menuItems: @Composable (close: () -> Unit) -> Unit,
+    modifier: Modifier,
+) {
+    val haptics = LocalHapticFeedback.current
+    val cols = HomeGrid.COLS
+    BoxWithConstraints(modifier) {
+        val rows = (maxHeight / 80.dp).toInt().coerceIn(6, 10)
+        LaunchedEffect(rows) { vm.setGridRows(rows) }
+        val cellW = maxWidth / cols
+        val cellH = maxHeight / rows
+        var menuAt by remember { mutableStateOf<DpOffset?>(null) }
+
+        Box(
+            Modifier
+                .fillMaxSize()
+                // the grid reports every cell's place on screen, filled or not
+                .onGloballyPositioned { coords ->
+                    val o = coords.boundsInWindow().topLeft
+                    val cw = coords.size.width / cols.toFloat()
+                    val ch = coords.size.height / rows.toFloat()
+                    placement.slots.keys.removeAll { it.area == Slot.HOME }
+                    for (r in 0 until rows) for (c in 0 until cols) {
+                        placement.slots[Slot(Slot.HOME, r * cols + c)] =
+                            Rect(o.x + c * cw, o.y + r * ch, o.x + (c + 1) * cw, o.y + (r + 1) * ch)
+                    }
+                }
+        ) {
+            // Empty cells: long-press for the home menu
+            for (r in 0 until rows) for (c in 0 until cols) {
+                if (items.none { it.covers(c, r) }) {
+                    Box(
+                        Modifier
+                            .offset(cellW * c, cellH * r)
+                            .size(cellW, cellH)
+                            .pointerInput(c, r, rows) {
+                                detectTapGestures(onLongPress = { p ->
+                                    haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                                    menuAt = DpOffset(cellW * c + p.x.toDp(), cellH * r + p.y.toDp())
+                                })
+                            }
+                    )
+                }
+            }
+
+            // Where the dragged item would land (apps under an app show their own ring)
+            val from = placement.dragging
+            val to = placement.target
+            if (from != null && to != null && to != from && to.area == Slot.HOME) {
+                val size = if (from.area == Slot.HOME) {
+                    items.firstOrNull { it.col == from.index % cols && it.row == from.index / cols }?.let { it.w to it.h }
+                } else null
+                val (w, h) = size ?: (1 to 1)
+                val tc = to.index % cols
+                val tr = to.index / cols
+                val onAnApp = items.any { !it.isWidget && it.covers(tc, tr) }
+                if (!(w == 1 && h == 1 && onAnApp)) {
+                    Box(
+                        Modifier.offset(cellW * tc, cellH * tr).size(cellW * w, cellH * h),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        if (w == 1 && h == 1) {
+                            Box(Modifier.size(60.dp).border(2.dp, colors.gold, CircleShape))
+                        } else {
+                            Box(Modifier.fillMaxSize().padding(3.dp).border(2.dp, colors.gold, RoundedCornerShape(20.dp)))
+                        }
+                    }
+                }
+            }
+
+            items.forEach { item ->
+                key(item.id) {
+                    val slot = Slot(Slot.HOME, item.row * cols + item.col)
+                    Box(
+                        Modifier
+                            .offset(cellW * item.col, cellH * item.row)
+                            .size(cellW * item.w, cellH * item.h)
+                            .zIndex(if (placement.dragging == slot) 1f else 0f),
+                        contentAlignment = if (item.isWidget) Alignment.TopStart else Alignment.Center,
+                    ) {
+                        if (!item.isWidget) {
+                            apps[item.id]?.let { entry ->
+                                AppTile(
+                                    entry, vm, colors, iconSize = 56.dp, showLabel = false,
+                                    modifier = Modifier.width(64.dp),
+                                    placement = placement, slot = slot, registerSlot = false,
+                                )
+                            }
+                        } else {
+                            GridWidget(
+                                id = item.id,
+                                slot = slot,
+                                placement = placement,
+                                colors = colors,
+                                now = now,
+                                clockStyle = clockStyle,
+                                showCalendar = showCalendar,
+                                onOpenClock = onOpenClock,
+                                onOpenEvent = onOpenEvent,
+                                onOpenCalendar = onOpenCalendar,
+                                onPickStyle = vm::setSolClock,
+                            )
+                        }
+                    }
+                }
+            }
+
+            if (items.none { !it.isWidget } && placement.dragging == null) {
+                Text(
+                    "Long-press any app, then Add to home",
+                    style = TextStyle(color = colors.inkSoft, fontSize = 13.sp),
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .background(colors.card.copy(alpha = 0.78f), RoundedCornerShape(14.dp))
+                        .padding(horizontal = 14.dp, vertical = 10.dp),
+                )
+            }
+
+            menuAt?.let { at ->
+                Box(Modifier.offset(at.x, at.y)) {
+                    DropdownMenu(expanded = true, onDismissRequest = { menuAt = null }) {
+                        menuItems { menuAt = null }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * A widget on the grid. Hold and move it to drag it into free space; a tap goes to the
+ * widget itself (open the clock or calendar). Holding the clock without moving opens its
+ * style picker. While anything is dragged, widgets show a faint outline of the space they take.
+ */
+@Composable
+private fun GridWidget(
+    id: String,
+    slot: Slot,
+    placement: Placement,
+    colors: NumioColors,
+    now: Long,
+    clockStyle: SolClock,
+    showCalendar: Boolean,
+    onOpenClock: () -> Unit,
+    onOpenEvent: (Long, Long) -> Unit,
+    onOpenCalendar: () -> Unit,
+    onPickStyle: (SolClock) -> Unit,
+) {
+    val haptics = LocalHapticFeedback.current
+    var picker by remember { mutableStateOf(false) }
+    val onTap: () -> Unit = when (id) {
+        HomeGrid.CLOCK -> onOpenClock
+        HomeGrid.MONTH -> onOpenCalendar
+        else -> ({})
+    }
+    val label = when (id) {
+        HomeGrid.CLOCK -> "Clock"
+        HomeGrid.MONTH -> "Calendar"
+        else -> "Next alarm"
+    }
+    Box(
+        Modifier
+            .fillMaxSize()
+            .semantics {
+                onLongClick(label = if (id == HomeGrid.CLOCK) "Change clock style" else "Move $label") {
+                    if (id == HomeGrid.CLOCK) picker = true
+                    true
+                }
+            }
+            .appCell(
+                placement, slot, id,
+                onTap = onTap,
+                onHoldStart = { haptics.performHapticFeedback(HapticFeedbackType.LongPress) },
+                onMenu = { if (id == HomeGrid.CLOCK) picker = true },
+                register = false,
+            )
+            .then(
+                if (placement.dragging != null) {
+                    Modifier.border(1.dp, colors.inkSoft.copy(alpha = 0.3f), RoundedCornerShape(20.dp))
+                } else Modifier
+            ),
+        contentAlignment = if (id == HomeGrid.TODAY) Alignment.CenterStart else Alignment.TopStart,
+    ) {
+        when (id) {
+            HomeGrid.CLOCK -> SolClockView(colors, now, clockStyle, picker, { picker = false }, onPickStyle)
+            HomeGrid.TODAY -> SolToday(colors, now, showCalendar, onOpenClock, onOpenEvent)
+            HomeGrid.MONTH -> MonthCard(now, showCalendar, onOpenCalendar, Modifier.fillMaxWidth().padding(end = 8.dp))
         }
     }
 }
@@ -216,11 +444,10 @@ private fun SolClockView(
     colors: NumioColors,
     now: Long,
     style: SolClock,
-    onOpenClock: () -> Unit,
+    picker: Boolean,
+    onDismissPicker: () -> Unit,
     onPickStyle: (SolClock) -> Unit,
 ) {
-    val haptics = LocalHapticFeedback.current
-    var picker by remember { mutableStateOf(false) }
     val context = LocalContext.current
     val is24 = DateFormat.is24HourFormat(context)
     val time = SimpleDateFormat(if (is24) "HH:mm" else "h:mm", Locale.ENGLISH).format(Date(now))
@@ -231,22 +458,10 @@ private fun SolClockView(
     BoxWithConstraints(
         Modifier
             .fillMaxWidth()
-            .semantics(mergeDescendants = true) { contentDescription = spoken }
-            .combinedClickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null,
-                role = Role.Button,
-                onClickLabel = "Open clock",
-                onLongClickLabel = "Change clock style",
-                onLongClick = {
-                    haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                    picker = true
-                },
-                onClick = onOpenClock,
-            ),
+            .semantics(mergeDescendants = true) { contentDescription = spoken },
     ) {
-        // Long-press the clock: pick a style, each one shown in its own numerals
-        DropdownMenu(expanded = picker, onDismissRequest = { picker = false }, offset = DpOffset(0.dp, 0.dp)) {
+        // Hold the clock (without moving): pick a style, each one shown in its own numerals
+        DropdownMenu(expanded = picker, onDismissRequest = onDismissPicker, offset = DpOffset(0.dp, 0.dp)) {
             SolClock.entries.forEach { option ->
                 DropdownMenuItem(
                     text = {
@@ -261,7 +476,7 @@ private fun SolClockView(
                             )
                         }
                     },
-                    onClick = { picker = false; onPickStyle(option) },
+                    onClick = { onDismissPicker(); onPickStyle(option) },
                 )
             }
         }
@@ -324,7 +539,6 @@ private fun SolToday(
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
-            .padding(top = 14.dp)
             .background(colors.card.copy(alpha = 0.8f), CircleShape)
             .border(1.dp, colors.ink.copy(alpha = 0.08f), CircleShape)
             .padding(horizontal = 14.dp, vertical = 8.dp),
@@ -355,54 +569,6 @@ private fun SolToday(
     }
 }
 
-@Composable
-private fun SolMenuArea(
-    colors: NumioColors,
-    isDefault: Boolean,
-    showCalendar: Boolean,
-    wallpaper: SolWallpaper,
-    onWallpaper: (SolWallpaper) -> Unit,
-    onToggleCalendar: () -> Unit,
-    onSwitchTheme: () -> Unit,
-    onRequestHome: () -> Unit,
-    onLauncherInfo: () -> Unit,
-    modifier: Modifier,
-) {
-    val haptics = LocalHapticFeedback.current
-    val density = LocalDensity.current
-    var menuAt by remember { mutableStateOf<Offset?>(null) }
-    Box(
-        modifier.pointerInput(Unit) {
-            detectTapGestures(onLongPress = {
-                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                menuAt = it
-            })
-        }
-    ) {
-        val at = menuAt
-        Box(Modifier.offset(x = with(density) { (at?.x ?: 0f).toDp() }, y = with(density) { (at?.y ?: 0f).toDp() })) {
-            DropdownMenu(expanded = at != null, onDismissRequest = { menuAt = null }, offset = DpOffset.Zero) {
-                DropdownMenuItem(
-                    text = { Text(if (wallpaper == SolWallpaper.Garden) "✓  Garden wallpaper" else "Garden wallpaper") },
-                    onClick = { menuAt = null; onWallpaper(SolWallpaper.Garden) },
-                )
-                DropdownMenuItem(
-                    text = { Text(if (wallpaper == SolWallpaper.Petal) "✓  Petal wallpaper" else "Petal wallpaper") },
-                    onClick = { menuAt = null; onWallpaper(SolWallpaper.Petal) },
-                )
-                DropdownMenuItem(
-                    text = { Text(if (showCalendar) "✓  Show next calendar event" else "Show next calendar event") },
-                    onClick = { menuAt = null; onToggleCalendar() },
-                )
-                DropdownMenuItem(text = { Text("Switch to Ink theme") }, onClick = { menuAt = null; onSwitchTheme() })
-                if (!isDefault) {
-                    DropdownMenuItem(text = { Text("Set as home screen") }, onClick = { menuAt = null; onRequestHome() })
-                }
-                DropdownMenuItem(text = { Text("Launcher app info") }, onClick = { menuAt = null; onLauncherInfo() })
-            }
-        }
-    }
-}
 
 /** One row of cells (home or dock). Empty cells take drops; the target gets a gold ring. */
 @Composable
@@ -440,35 +606,6 @@ private fun CellRow(
                     }
                 }
             }
-        }
-    }
-}
-
-/** Sol's home: two rows of five cells. Add apps with "Add to home", then drag them anywhere. */
-@Composable
-private fun HomeGrid(
-    vm: LauncherViewModel,
-    colors: NumioColors,
-    cells: List<AppEntry?>,
-    placement: Placement,
-    modifier: Modifier = Modifier,
-) {
-    Box(modifier, contentAlignment = Alignment.Center) {
-        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            cells.chunked(5).forEachIndexed { r, row ->
-                // the row holding the lifted app is drawn on top, so it passes over the other row
-                val liftedHere = placement.dragging?.let { it.area == Slot.HOME && it.index / 5 == r } == true
-                CellRow(vm, colors, row, Slot.HOME, r * 5, placement, Modifier.zIndex(if (liftedHere) 1f else 0f))
-            }
-        }
-        if (cells.all { it == null } && placement.dragging == null) {
-            Text(
-                "Long-press any app, then Add to home",
-                style = TextStyle(color = colors.inkSoft, fontSize = 13.sp),
-                modifier = Modifier
-                    .background(colors.card.copy(alpha = 0.78f), RoundedCornerShape(14.dp))
-                    .padding(horizontal = 14.dp, vertical = 10.dp),
-            )
         }
     }
 }

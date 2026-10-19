@@ -38,7 +38,7 @@ class PlacementGestureTest {
 
     private fun setUp() {
         rule.setContent {
-            val placement = rememberPlacement { from, to -> dropped = from to to }
+            val placement = rememberPlacement(onDrop = { from, to -> dropped = from to to })
             Row {
                 repeat(2) { i ->
                     Box(
