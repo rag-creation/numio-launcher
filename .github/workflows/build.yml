@@ -61,18 +61,20 @@ jobs:
             done
           done
 
-      # One line per test class (tests run, failures, skipped), shown on the run page
+      # One line with every test class (tests run / failed), shown on the run page
       - name: Test summary
         if: always()
         run: |
+          total=0; failed=0; parts=""
           for f in app/build/test-results/testDebugUnitTest/*.xml; do
             [ -f "$f" ] || continue
             name=$(grep -o 'testsuite name="[^"]*"' "$f" | head -1 | sed 's/.*name="//;s/"//')
             t=$(grep -o 'tests="[0-9]*"' "$f" | head -1 | tr -dc 0-9)
             fl=$(grep -o 'failures="[0-9]*"' "$f" | head -1 | tr -dc 0-9)
-            sk=$(grep -o 'skipped="[0-9]*"' "$f" | head -1 | tr -dc 0-9)
-            echo "::notice::${name##*.}: ${t} tests, ${fl} failed, ${sk} skipped"
+            total=$((total + t)); failed=$((failed + fl))
+            parts="$parts ${name##*.} $t/$fl,"
           done
+          echo "::notice::Tests: $total run, $failed failed. Per class (run/failed):${parts%,}"
 
       - name: Name the APK
         run: |
