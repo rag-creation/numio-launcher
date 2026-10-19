@@ -250,7 +250,7 @@ def wobble(points, seed, amp=0.55):
     return out
 
 
-SCALE = 1.42      # the 56-unit content box spans 1.42 x the disc radius
+SCALE = 1.55      # the 56-unit content box spans 1.55 x the disc radius
 INK_W = 4.4       # outline width in grid units
 THIN_W = 3.0
 HATCH_W = 2.4

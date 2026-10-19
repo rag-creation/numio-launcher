@@ -44,6 +44,35 @@ class SketchRolesTest {
         assertEquals(SketchKind.Phone, SketchRoles.kindFor(pkg, "Galaxy", roles))
     }
 
+    private fun h(p: String, pre: Boolean) = SketchRoles.Handler(p, pre)
+
+    @Test fun yourDefaultAppGetsTheSymbolEvenIfYouInstalledIt() {
+        // Fossify Phone set as the dialer: it wins over the preinstalled one
+        assertEquals(
+            setOf("org.fossify.phone"),
+            SketchRoles.choose(listOf("org.fossify.phone"), listOf(h("org.fossify.phone", false), h("com.samsung.android.dialer", true))),
+        )
+        // Fennec as the default browser
+        assertEquals(setOf("org.mozilla.fennec_fdroid"), SketchRoles.choose(listOf("org.mozilla.fennec_fdroid", null), emptyList()))
+    }
+
+    @Test fun withoutADefaultThePreinstalledAppsCount() {
+        assertEquals(
+            setOf("com.sec.android.app.camera"),
+            SketchRoles.choose(listOf("android"), listOf(h("com.sec.android.app.camera", true), h("net.sourceforge.opencamera", false))),
+        )
+    }
+
+    @Test fun withNeitherOnlyASingleAppCounts() {
+        // one calendar app installed: it gets the symbol
+        assertEquals(setOf("org.fossify.calendar"), SketchRoles.choose(listOf(null), listOf(h("org.fossify.calendar", false))))
+        // three calendars and no default: none is singled out, each keeps its own look
+        assertEquals(
+            emptySet<String>(),
+            SketchRoles.choose(listOf("android"), listOf(h("org.fossify.calendar", false), h("com.goodwy.calendar", false), h("com.rr.numio.calendar", false))),
+        )
+    }
+
     @Test fun everyJobHasAWayToBeFound() {
         val intents = SketchRoles.intents()
         for (k in SketchKind.entries) assertTrue("$k has no intent", intents[k].orEmpty().isNotEmpty())

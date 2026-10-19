@@ -2,7 +2,10 @@ package com.rr.numio.launcher.sketch
 
 import android.content.Context
 import android.content.Intent
+import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
+import android.provider.Telephony
+import android.telecom.TelecomManager
 import android.net.Uri
 import android.provider.AlarmClock
 import android.provider.MediaStore
@@ -53,9 +56,13 @@ sealed interface Layer {
  * (the default dialer, the default SMS app, the camera…), found by asking Android, so no
  * app or package names are assumed.
  *
- * Only apps that came with the phone get these shared symbols. An app you installed
- * yourself (another browser, a different SMS app) keeps its own look until it gets its
- * own drawing, so it never loses its identity to a generic globe or bubble.
+ * Which app counts, for each job:
+ *  1. the app you chose as the default (your Phone, SMS or browser app), even one you
+ *     installed yourself, such as Fossify Phone or Fennec;
+ *  2. with no default chosen, the phone's own preinstalled app for that job;
+ *  3. with neither, the only app that does the job, if there is just one.
+ * Other apps that can do the same job (a second calendar, say) keep their own look, so
+ * you can still tell them apart.
  */
 object SketchRoles {
 
@@ -84,17 +91,45 @@ object SketchRoles {
         SketchKind.Clock to listOf(Intent(AlarmClock.ACTION_SHOW_ALARMS)),
     )
 
-    /** For each job, the phone's own (preinstalled) apps that do it. */
+    /** One app that can do a job: its package and whether it came with the phone. */
+    data class Handler(val packageName: String, val preinstalled: Boolean)
+
+    /**
+     * The apps that get a job's symbol: your chosen default, else the preinstalled ones,
+     * else the only one there is. "android" (the app chooser) is never a choice.
+     */
+    fun choose(defaults: List<String?>, handlers: List<Handler>): Set<String> {
+        val chosen = defaults.filterNotNull().filter { it.isNotEmpty() && it != "android" }.toSet()
+        if (chosen.isNotEmpty()) return chosen
+        val real = handlers.filter { it.packageName != "android" }
+        val preinstalled = real.filter { it.preinstalled }.map { it.packageName }.toSet()
+        if (preinstalled.isNotEmpty()) return preinstalled
+        val all = real.map { it.packageName }.toSet()
+        return if (all.size == 1) all else emptySet()
+    }
+
     fun detect(context: Context): Map<SketchKind, Set<String>> {
         val pm = context.packageManager
-        return intents().mapValues { (_, list) ->
-            list.flatMap { intent ->
+        fun safe(block: () -> String?): String? = try { block() } catch (e: Exception) { null }
+        return intents().mapValues { (kind, list) ->
+            val defaults = list.map { intent ->
+                safe { pm.resolveActivity(intent, PackageManager.MATCH_DEFAULT_ONLY)?.activityInfo?.packageName }
+            } + when (kind) {
+                SketchKind.Phone -> listOf(safe { context.getSystemService(TelecomManager::class.java)?.defaultDialerPackage })
+                SketchKind.Messages -> listOf(safe { Telephony.Sms.getDefaultSmsPackage(context) })
+                else -> emptyList()
+            }
+            val handlers = list.flatMap { intent ->
                 try {
-                    pm.queryIntentActivities(intent, PackageManager.MATCH_SYSTEM_ONLY).map { it.activityInfo.packageName }
+                    pm.queryIntentActivities(intent, 0).map {
+                        val flags = it.activityInfo.applicationInfo.flags
+                        Handler(it.activityInfo.packageName, flags and ApplicationInfo.FLAG_SYSTEM != 0)
+                    }
                 } catch (e: Exception) {
                     emptyList()
                 }
-            }.filter { it != "android" }.toSet()
+            }
+            choose(defaults, handlers)
         }
     }
 
