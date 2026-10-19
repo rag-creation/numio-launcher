@@ -7,6 +7,7 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.performScrollTo
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.rr.numio.launcher.data.HomeTheme
 import com.rr.numio.launcher.data.PortalAction
@@ -61,49 +62,49 @@ class PortalUiTest {
 
     @Test fun colourIsPreviewedFirstAndOnlySavedOnApply() {
         menu(PortalSettings(color = PortalColor.Gold), hasWork = true)
-        rule.onNodeWithContentDescription("Preview, Numio gold").assertExists()
-        rule.onNodeWithContentDescription("Olive").performClick()
-        rule.onNodeWithContentDescription("Preview, Olive").assertExists()
+        rule.onNodeWithContentDescription("Preview, Numio gold").performScrollTo().assertExists()
+        rule.onNodeWithContentDescription("Olive").performScrollTo().performClick()
+        rule.onNodeWithContentDescription("Preview, Olive").performScrollTo().assertExists()
         rule.runOnIdle { assertNull(applied) }
-        rule.onNodeWithText("Apply").performClick()
+        rule.onNodeWithText("Apply").performScrollTo().performClick()
         rule.runOnIdle { assertEquals(PortalColor.Olive, applied!!.color) }
     }
 
     @Test fun cancelSavesNothing() {
         menu(PortalSettings(), hasWork = true)
-        rule.onNodeWithContentDescription("Charcoal").performClick()
-        rule.onNodeWithText("Cancel").performClick()
+        rule.onNodeWithContentDescription("Charcoal").performScrollTo().performClick()
+        rule.onNodeWithText("Cancel").performScrollTo().performClick()
         rule.runOnIdle { assertEquals(1, cancelled); assertNull(applied) }
     }
 
     @Test fun withoutAWorkProfile_workspaceIsMarkedUnavailableAndCantBePicked() {
         menu(PortalSettings(action = null, apps = listOf("a#0")), hasWork = false)
-        rule.onNodeWithText("Not available: no work profile on this phone").assertExists()
-        rule.onNodeWithText("Workspace").performClick()
-        rule.onNodeWithText("Apply").performClick()
+        rule.onNodeWithText("Not available: no work profile on this phone").performScrollTo().assertExists()
+        rule.onNodeWithText("Workspace").performScrollTo().performClick()
+        rule.onNodeWithText("Apply").performScrollTo().performClick()
         // still unset, so it keeps meaning "Selected apps" here
         rule.runOnIdle { assertNull(applied!!.action); assertEquals(listOf("a#0"), applied!!.apps) }
     }
 
     @Test fun pickingEachTapMode() {
         menu(PortalSettings(), hasWork = true)
-        rule.onNodeWithText("Nothing").performClick()
-        rule.onNodeWithText("Apply").performClick()
+        rule.onNodeWithText("Nothing").performScrollTo().performClick()
+        rule.onNodeWithText("Apply").performScrollTo().performClick()
         rule.runOnIdle { assertEquals(PortalAction.Off, applied!!.action) }
     }
 
     @Test fun selectedAppsMode() {
         menu(PortalSettings(action = PortalAction.Workspace), hasWork = true)
-        rule.onNodeWithText("Selected apps").performClick()
-        rule.onNodeWithText("Apply").performClick()
+        rule.onNodeWithText("Selected apps").performScrollTo().performClick()
+        rule.onNodeWithText("Apply").performScrollTo().performClick()
         rule.runOnIdle { assertEquals(PortalAction.Selected, applied!!.action) }
     }
 
     @Test fun hidingKeepsColourActionAndApps() {
         val start = PortalSettings(visible = true, action = PortalAction.Selected, color = PortalColor.Olive, apps = listOf("a#0", "b#0"))
         menu(start, hasWork = true)
-        rule.onNodeWithText("Show on home screen").performClick()
-        rule.onNodeWithText("Apply").performClick()
+        rule.onNodeWithText("Show on home screen").performScrollTo().performClick()
+        rule.onNodeWithText("Apply").performScrollTo().performClick()
         rule.runOnIdle { assertEquals(start.copy(visible = false), applied) }
     }
 }
