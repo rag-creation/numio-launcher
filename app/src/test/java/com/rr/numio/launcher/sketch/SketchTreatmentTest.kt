@@ -51,6 +51,10 @@ class SketchTreatmentTest {
         override fun getOpacity() = android.graphics.PixelFormat.TRANSLUCENT
     }
 
+    /** Dark ink pixels of a whole icon (its paper circle is opaque, so alpha alone won't do). */
+    private fun dark(b: Bitmap) = IntArray(px * px).also { b.getPixels(it, 0, px, 0, 0, px, px) }
+        .map { (it ushr 24) > 200 && ((it shr 16) and 0xFF) < 90 }
+
     private fun inked(b: Bitmap) = IntArray(px * px).also { b.getPixels(it, 0, px, 0, 0, px, px) }.map { (it ushr 24) > 128 }
 
     @Test fun silhouetteStaysButTheLineChanges() {
@@ -82,9 +86,9 @@ class SketchTreatmentTest {
             }
             return b
         }
-        val letter = inked(draw(mono = false, derived = null))
-        val extracted = inked(draw(mono = false, derived = flatMark()))
-        val own = inked(draw(mono = true, derived = flatMark()))
+        val letter = dark(draw(mono = false, derived = null))
+        val extracted = dark(draw(mono = false, derived = flatMark()))
+        val own = dark(draw(mono = true, derived = flatMark()))
         // something readable is always drawn
         val lc = letter.count { it }
         assertTrue("letter fallback drew $lc dark pixels", lc > 200)
