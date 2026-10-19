@@ -60,9 +60,20 @@ class PortalRulesTest {
     }
 
     @Test fun lowContrastWarnings() {
-        assertTrue(PortalRules.lowContrast(PortalColor.Cream, HomeTheme.Sol))
-        assertTrue(PortalRules.lowContrast(PortalColor.Charcoal, HomeTheme.Ink))
-        assertFalse(PortalRules.lowContrast(PortalColor.Olive, HomeTheme.Sol))
+        // olive sinks into the sage buttons, cream into the light ones
+        assertTrue(PortalRules.lowContrast(PortalColor.Olive, PortalStyle.SageCeramic))
+        assertTrue(PortalRules.lowContrast(PortalColor.Olive, PortalStyle.Extruded))
+        assertTrue(PortalRules.lowContrast(PortalColor.Cream, PortalStyle.FloatingCeramic))
+        assertTrue(PortalRules.lowContrast(PortalColor.Cream, PortalStyle.Glass))
+        for (st in PortalStyle.entries) assertFalse(PortalRules.lowContrast(PortalColor.Gold, st))
+        assertFalse(PortalRules.lowContrast(PortalColor.Charcoal, PortalStyle.SageCeramic))
+    }
+
+    @Test fun styleIdsRoundTripAndUnknownFallsBackToSage() {
+        for (st in PortalStyle.entries) assertEquals(st, PortalStyle.of(st.id))
+        assertEquals(PortalStyle.SageCeramic, PortalStyle.of(null))
+        assertEquals(PortalStyle.SageCeramic, PortalStyle.of("something-old"))
+        assertEquals(PortalStyle.entries.size, PortalStyle.entries.map { it.id }.toSet().size)
     }
 
     private data class App(val key: String, val label: String)

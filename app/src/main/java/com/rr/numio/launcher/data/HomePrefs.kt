@@ -55,6 +55,7 @@ class HomePrefs(context: Context) {
             visible = p[PORTAL_VISIBLE] ?: true,
             action = PortalAction.of(p[PORTAL_ACTION]),
             color = PortalColor.of(p[PORTAL_COLOR]),
+            style = PortalStyle.of(p[PORTAL_STYLE]),
             apps = p[PORTAL_APPS]?.split('\n')?.filter { it.isNotEmpty() }.orEmpty(),
         )
     }
@@ -64,6 +65,7 @@ class HomePrefs(context: Context) {
             it[PORTAL_VISIBLE] = s.visible
             if (s.action == null) it.remove(PORTAL_ACTION) else it[PORTAL_ACTION] = s.action.id
             it[PORTAL_COLOR] = s.color.id
+            it[PORTAL_STYLE] = s.style.id
             it[PORTAL_APPS] = s.apps.joinToString("\n")
         }
     }
@@ -145,5 +147,6 @@ class HomePrefs(context: Context) {
         private val PORTAL_ACTION = stringPreferencesKey("portal_action")
         private val PORTAL_COLOR = stringPreferencesKey("portal_color")
         private val PORTAL_APPS = stringPreferencesKey("portal_apps")
+        private val PORTAL_STYLE = stringPreferencesKey("portal_style")
     }
 }

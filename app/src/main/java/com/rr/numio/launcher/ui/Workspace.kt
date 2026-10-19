@@ -30,6 +30,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import com.rr.numio.launcher.data.PortalTap
+import com.rr.numio.launcher.data.PortalStyle
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.runtime.remember
@@ -83,8 +84,8 @@ fun NumioLogo(tint: Long?, size: Dp, modifier: Modifier = Modifier) {
 }
 
 /**
- * Ink's logo: the bare mark with an invisible 56dp touch area around it.
- * Tap does what it's set to; long-press opens the customization menu (and never also taps).
+ * Ink's logo button, at a fixed spot. Tap plays the sun-ray burst and then does what it's set
+ * to (once); long-press opens the customization menu (and never also taps).
  */
 @Composable
 fun PortalButton(
@@ -93,18 +94,21 @@ fun PortalButton(
     onTap: () -> Unit,
     onLongPress: () -> Unit,
     modifier: Modifier = Modifier,
+    style: PortalStyle = PortalStyle.SageCeramic,
 ) {
     val haptics = LocalHapticFeedback.current
+    val tap = rememberSunRayTap(onTap)
     Box(
         contentAlignment = Alignment.Center,
         modifier = modifier
-            .size(56.dp)
+            .size(60.dp)
+            .sunRays({ tap.progress.value })
             .semantics { contentDescription = description }
             .combinedClickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
                 role = Role.Button,
-                onClick = onTap,
+                onClick = tap.onTap,
                 onLongClickLabel = "Customize the Numio logo",
                 onLongClick = {
                     haptics.performHapticFeedback(HapticFeedbackType.LongPress)
@@ -112,7 +116,7 @@ fun PortalButton(
                 },
             ),
     ) {
-        NumioLogo(tint, 44.dp)
+        PortalVisual(style, tint)
     }
 }
 

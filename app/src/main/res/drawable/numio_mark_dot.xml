@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The official Numio mark's dot, same canvas, centre and radius as art/numio-mark.svg,
+     in white for the logo button. NumioMarkTest checks it matches. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp"
+    android:height="48dp"
+    android:viewportWidth="1000"
+    android:viewportHeight="1000">
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M763.1,767.4 A42.6,42.6 0 1,0 848.3,767.4 A42.6,42.6 0 1,0 763.1,767.4 Z" />
+</vector>

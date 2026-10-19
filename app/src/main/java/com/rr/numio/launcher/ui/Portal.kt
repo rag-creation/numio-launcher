@@ -76,6 +76,7 @@ import com.rr.numio.launcher.data.PortalAction
 import com.rr.numio.launcher.data.PortalColor
 import com.rr.numio.launcher.data.PortalRules
 import com.rr.numio.launcher.data.PortalSettings
+import com.rr.numio.launcher.data.PortalStyle
 import com.rr.numio.launcher.search.AppSearch
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -146,16 +147,42 @@ fun PortalSettingsContent(
                 .fillMaxWidth()
                 .height(96.dp)
                 .background(previewBg, RoundedCornerShape(18.dp))
-                .semantics { contentDescription = "Preview, ${draft.color.label}" },
+                .semantics { contentDescription = "Preview, ${draft.style.label}, ${draft.color.label}" },
         ) {
-            NumioLogo(PortalRules.color(draft.color, theme), 60.dp, Modifier.alpha(if (draft.visible) 1f else 0.35f))
+            PortalVisual(draft.style, PortalRules.color(draft.color, theme), Modifier.alpha(if (draft.visible) 1f else 0.35f), size = 60.dp)
         }
-        if (PortalRules.lowContrast(draft.color, theme)) {
+        if (PortalRules.lowContrast(draft.color, draft.style)) {
             Text(
-                "Hard to see on this theme",
+                "Hard to see on this button",
                 style = TextStyle(color = colors.inkSoft, fontSize = 12.sp),
                 modifier = Modifier.padding(top = 6.dp),
             )
+        }
+
+        Spacer(Modifier.height(16.dp))
+        Text("Button", style = title)
+        Spacer(Modifier.height(6.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+            PortalStyle.entries.forEach { st ->
+                val selected = draft.style == st
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier
+                        .weight(1f)
+                        .background(if (selected) colors.ink.copy(alpha = 0.08f) else Color.Transparent, RoundedCornerShape(14.dp))
+                        .border(if (selected) 2.dp else 0.dp, if (selected) colors.ink else Color.Transparent, RoundedCornerShape(14.dp))
+                        .semantics {
+                            contentDescription = "${st.label} button"
+                            stateDescription = if (selected) "Selected" else "Not selected"
+                        }
+                        .selectable(selected = selected, role = Role.RadioButton) { draft = draft.copy(style = st) }
+                        .padding(vertical = 8.dp),
+                ) {
+                    PortalVisual(st, PortalRules.color(draft.color, theme), size = 40.dp)
+                    Spacer(Modifier.height(6.dp))
+                    Text(st.label, style = TextStyle(color = colors.ink, fontSize = 11.sp), maxLines = 1)
+                }
+            }
         }
 
         Spacer(Modifier.height(16.dp))

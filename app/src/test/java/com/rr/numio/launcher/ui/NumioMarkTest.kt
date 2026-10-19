@@ -45,4 +45,26 @@ class NumioMarkTest {
         assertTrue(svg.contains("viewBox=\"0 0 1000 1000\""))
         assertTrue(vector.contains("android:viewportWidth=\"1000\"") && vector.contains("android:viewportHeight=\"1000\""))
     }
+
+    // ── the button's layers: the same official shapes, split so the dot can be white ──
+
+    private val nLayer = File("src/main/res/drawable/numio_mark_n.xml").readText()
+    private val dotLayer = File("src/main/res/drawable/numio_mark_dot.xml").readText()
+    private fun paths(v: String) = Regex("pathData=\"([^\"]+)\"").findAll(v).map { it.groupValues[1] }.toList()
+
+    @Test fun buttonLayersUseTheOfficialGeometryUnchanged() {
+        val whole = paths(vector)
+        assertEquals(whole.take(2).map(::nums), paths(nLayer).map(::nums))   // the angular N, point for point
+        assertEquals(listOf(nums(whole.last())), paths(dotLayer).map(::nums)) // the dot, same place and size
+        for (v in listOf(nLayer, dotLayer)) {
+            assertTrue(v.contains("android:viewportWidth=\"1000\"") && v.contains("android:viewportHeight=\"1000\""))
+        }
+    }
+
+    @Test fun buttonNIsOfficialAmberAndItsDotIsWhite() {
+        val n = Regex("fillColor=\"(#[0-9a-fA-F]{6,8})\"").findAll(nLayer).map { it.groupValues[1].uppercase() }.toSet()
+        val d = Regex("fillColor=\"(#[0-9a-fA-F]{6,8})\"").findAll(dotLayer).map { it.groupValues[1].uppercase() }.toSet()
+        assertEquals(setOf("#FFC21A"), n)
+        assertTrue(d == setOf("#FFFFFF") || d == setOf("#FFFFFFFF"))
+    }
 }

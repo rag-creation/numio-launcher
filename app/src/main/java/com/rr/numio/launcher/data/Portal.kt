@@ -24,6 +24,18 @@ enum class PortalColor(val id: String, val label: String) {
     }
 }
 
+/** The button the logo sits on. Only its look; what a tap does is set separately. */
+enum class PortalStyle(val id: String, val label: String) {
+    SageCeramic("sage", "Sage ceramic"),
+    FloatingCeramic("floating", "Floating"),
+    Extruded("extruded", "3D"),
+    Glass("glass", "Glass");
+
+    companion object {
+        fun of(id: String?) = entries.firstOrNull { it.id == id } ?: SageCeramic
+    }
+}
+
 /** What a tap on the logo will actually do right now. */
 enum class PortalTap { OpenWorkspace, OpenSelected, Nothing, NoWorkProfile }
 
@@ -36,6 +48,7 @@ data class PortalSettings(
     /** null = never chosen: Workspace if the phone has a work profile, otherwise Selected apps. */
     val action: PortalAction? = null,
     val color: PortalColor = PortalColor.Gold,
+    val style: PortalStyle = PortalStyle.SageCeramic,
     /** Chosen personal apps by their launcher key (activity + profile), not by name. */
     val apps: List<String> = emptyList(),
 )
@@ -71,10 +84,12 @@ object PortalRules {
         PortalColor.Cream -> CREAM
     }
 
-    /** Colours that would be hard to see on that theme's own background. */
-    fun lowContrast(choice: PortalColor, theme: HomeTheme): Boolean =
-        (theme == HomeTheme.Sol && choice == PortalColor.Cream) ||
-            (theme == HomeTheme.Ink && choice == PortalColor.Charcoal)
+    /** Logo colours that would be hard to see on that button's own surface. */
+    fun lowContrast(choice: PortalColor, style: PortalStyle): Boolean = when (style) {
+        PortalStyle.SageCeramic, PortalStyle.Extruded -> choice == PortalColor.Olive
+        PortalStyle.FloatingCeramic -> choice == PortalColor.Cream
+        PortalStyle.Glass -> choice == PortalColor.Cream
+    }
 
     /**
      * The chosen apps that are still installed (in the order chosen), and how many aren't

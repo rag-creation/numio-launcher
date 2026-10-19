@@ -86,6 +86,7 @@ import com.rr.numio.launcher.data.AppEntry
 import com.rr.numio.launcher.data.Slot
 import com.rr.numio.launcher.data.HomeTheme
 import com.rr.numio.launcher.data.PortalRules
+import com.rr.numio.launcher.data.PortalStyle
 import com.rr.numio.launcher.data.HomeGrid
 import com.rr.numio.launcher.data.GridItem
 import com.rr.numio.launcher.data.SolClock
@@ -211,6 +212,7 @@ fun SolScreen(
                 onOpenCalendar = onOpenCalendar,
                 sun = sun,
                 portalTint = PortalRules.color(portal.color, HomeTheme.Sol),
+                portalStyle = portal.style,
                 portalDescription = portalDescription(PortalRules.tap(portal, hasWork)),
                 onTapPortal = vm::tapPortal,
                 onPortalMenu = vm::openPortalSettings,
@@ -276,6 +278,7 @@ private fun SolHomeGrid(
     onOpenCalendar: () -> Unit,
     sun: Offset?,
     portalTint: Long?,
+    portalStyle: PortalStyle,
     portalDescription: String,
     onTapPortal: () -> Unit,
     onPortalMenu: () -> Unit,
@@ -386,7 +389,7 @@ private fun SolHomeGrid(
                                     .size(56.dp)
                                     .zIndex(if (placement.dragging == sunSlot) 1f else 0f)
                             ) {
-                                PortalWidget(sunSlot, placement, portalTint, portalDescription, onTapPortal, onPortalMenu)
+                                PortalWidget(sunSlot, placement, portalTint, portalDescription, onTapPortal, onPortalMenu, portalStyle)
                             }
                         }
                     } else {
@@ -399,7 +402,7 @@ private fun SolHomeGrid(
                         contentAlignment = if (item.isWidget) Alignment.TopStart else Alignment.Center,
                     ) {
                         if (item.id == HomeGrid.PORTAL) {
-                            PortalWidget(slot, placement, portalTint, portalDescription, onTapPortal, onPortalMenu)
+                            PortalWidget(slot, placement, portalTint, portalDescription, onTapPortal, onPortalMenu, portalStyle)
                         } else if (!item.isWidget) {
                             apps[item.id]?.let { entry ->
                                 AppTile(
@@ -463,8 +466,11 @@ private fun PortalWidget(
     description: String,
     onTap: () -> Unit,
     onMenu: () -> Unit,
+    style: PortalStyle,
 ) {
     val haptics = LocalHapticFeedback.current
+    // tap: the sun-ray burst, then the chosen action, once
+    val tap = rememberSunRayTap(onTap)
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Box(
             contentAlignment = Alignment.Center,
@@ -472,18 +478,18 @@ private fun PortalWidget(
                 .size(56.dp)
                 .semantics {
                     contentDescription = description
-                    onClick(label = description) { onTap(); true }
+                    onClick(label = description) { tap.onTap(); true }
                     onLongClick(label = "Customize the Numio logo") { onMenu(); true }
                 }
                 .appCell(
                     placement, slot, HomeGrid.PORTAL,
-                    onTap = onTap,
+                    onTap = tap.onTap,
                     onHoldStart = { haptics.performHapticFeedback(HapticFeedbackType.LongPress) },
                     onMenu = onMenu,
                     register = false,
                 ),
         ) {
-            NumioLogo(tint, 44.dp)
+            PortalVisual(style, tint, Modifier.sunRays({ tap.progress.value }))
         }
     }
 }

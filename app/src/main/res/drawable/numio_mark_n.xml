@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The official Numio mark's N (its two angular halves), same 1000-unit canvas and points as
+     art/numio-mark.svg. Layered with numio_mark_dot.xml it forms the mark; drawn in two parts
+     only so the dot can be white on the logo button. NumioMarkTest checks they match. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp"
+    android:height="48dp"
+    android:viewportWidth="1000"
+    android:viewportHeight="1000">
+    <path
+        android:fillColor="#FFC21A"
+        android:pathData="M151.7,190.0 L428.4,404.2 L300.7,507.0 L300.7,810.0 L151.7,810.0 Z" />
+    <path
+        android:fillColor="#FFC21A"
+        android:pathData="M712.1,810.0 L435.4,595.8 L563.1,493.0 L563.1,190.0 L712.1,190.0 Z" />
+</vector>

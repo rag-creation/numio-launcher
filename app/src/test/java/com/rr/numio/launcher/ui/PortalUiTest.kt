@@ -13,6 +13,7 @@ import com.rr.numio.launcher.data.HomeTheme
 import com.rr.numio.launcher.data.PortalAction
 import com.rr.numio.launcher.data.PortalColor
 import com.rr.numio.launcher.data.PortalSettings
+import com.rr.numio.launcher.data.PortalStyle
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Rule
@@ -62,9 +63,9 @@ class PortalUiTest {
 
     @Test fun colourIsPreviewedFirstAndOnlySavedOnApply() {
         menu(PortalSettings(color = PortalColor.Gold), hasWork = true)
-        rule.onNodeWithContentDescription("Preview, Numio gold").performScrollTo().assertExists()
+        rule.onNodeWithContentDescription("Preview, Sage ceramic, Numio gold").performScrollTo().assertExists()
         rule.onNodeWithContentDescription("Olive").performScrollTo().performClick()
-        rule.onNodeWithContentDescription("Preview, Olive").performScrollTo().assertExists()
+        rule.onNodeWithContentDescription("Preview, Sage ceramic, Olive").performScrollTo().assertExists()
         rule.runOnIdle { assertNull(applied) }
         rule.onNodeWithText("Apply").performScrollTo().performClick()
         rule.runOnIdle { assertEquals(PortalColor.Olive, applied!!.color) }
@@ -106,5 +107,47 @@ class PortalUiTest {
         rule.onNodeWithText("Show on home screen").performScrollTo().performClick()
         rule.onNodeWithText("Apply").performScrollTo().performClick()
         rule.runOnIdle { assertEquals(start.copy(visible = false), applied) }
+    }
+
+    // ── the button's look ───────────────────────────────────────────────────
+
+    @Test fun sageCeramicIsTheDefaultLook() {
+        assertEquals(PortalStyle.SageCeramic, PortalSettings().style)
+        menu(PortalSettings(), hasWork = true)
+        rule.onNodeWithContentDescription("Preview, Sage ceramic, Numio gold").performScrollTo().assertExists()
+    }
+
+    @Test fun styleIsPreviewedFirstAndOnlySavedOnApply() {
+        val start = PortalSettings(action = PortalAction.Selected, color = PortalColor.Olive, apps = listOf("a/.A#0"))
+        menu(start, hasWork = true)
+        rule.onNodeWithContentDescription("Glass button").performScrollTo().performClick()
+        rule.onNodeWithContentDescription("Preview, Glass, Olive").performScrollTo().assertExists()
+        rule.runOnIdle { assertNull(applied) }
+        rule.onNodeWithText("Apply").performScrollTo().performClick()
+        // only the look changed; colour, action, apps and visibility are kept
+        rule.runOnIdle { assertEquals(start.copy(style = PortalStyle.Glass), applied) }
+    }
+
+    @Test fun everyStyleCanBePicked() {
+        menu(PortalSettings(), hasWork = true)
+        for (st in PortalStyle.entries) {
+            rule.onNodeWithContentDescription("${st.label} button").performScrollTo().performClick()
+            rule.onNodeWithContentDescription("Preview, ${st.label}, Numio gold").performScrollTo().assertExists()
+        }
+    }
+
+    @Test fun aQuickDoubleTapStillRunsTheActionOnce() {
+        rule.setContent {
+            PortalButton(tint = null, description = "Numio logo", onTap = { taps++ }, onLongPress = { menus++ }, style = PortalStyle.Extruded)
+        }
+        rule.mainClock.autoAdvance = false
+        rule.onNodeWithContentDescription("Numio logo").performClick()
+        rule.onNodeWithContentDescription("Numio logo").performClick()
+        rule.mainClock.advanceTimeBy(100)
+        assertEquals(0, taps)          // the burst plays first
+        rule.mainClock.advanceTimeBy(1000)
+        rule.waitForIdle()
+        assertEquals(1, taps)
+        assertEquals(0, menus)
     }
 }

@@ -167,6 +167,7 @@ fun CanvasScreen(
                 description = portalDescription(PortalRules.tap(portal, hasWork)),
                 onTap = vm::tapPortal,
                 onLongPress = vm::openPortalSettings,
+                style = portal.style,
                 modifier = Modifier
                     .align(Alignment.TopEnd)
                     .statusBarsPadding()

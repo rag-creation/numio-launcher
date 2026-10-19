@@ -33,4 +33,14 @@ class PortalPrefsTest {
         assertEquals(null, prefs.portal.first().action)
         assertEquals(listOf("wa/.Main#0", "cal/.A#0"), prefs.portal.first().apps)
     }
+
+    @Test fun buttonStyleIsSavedWithoutTouchingTheRest() = runBlocking {
+        val prefs = HomePrefs(ApplicationProvider.getApplicationContext())
+        assertEquals(PortalStyle.SageCeramic, prefs.portal.first().style)
+        val chosen = PortalSettings(action = PortalAction.Selected, color = PortalColor.Charcoal, apps = listOf("a/.A#0"))
+        for (st in PortalStyle.entries) {
+            prefs.setPortal(chosen.copy(style = st))
+            assertEquals(chosen.copy(style = st), HomePrefs(ApplicationProvider.getApplicationContext()).portal.first())
+        }
+    }
 }
