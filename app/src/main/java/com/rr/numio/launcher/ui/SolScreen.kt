@@ -418,7 +418,11 @@ private fun CellRow(
     Row(modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         cells.forEachIndexed { c, entry ->
             val slot = Slot(area, first + c)
-            Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
+            // the cell holding the lifted app is drawn above its neighbours, so it floats over them
+            Box(
+                Modifier.weight(1f).zIndex(if (placement.dragging == slot) 1f else 0f),
+                contentAlignment = Alignment.Center,
+            ) {
                 if (entry != null) {
                     AppTile(
                         entry, vm, colors, iconSize = 56.dp, showLabel = false,
