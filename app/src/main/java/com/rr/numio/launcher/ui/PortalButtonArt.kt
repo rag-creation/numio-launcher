@@ -48,8 +48,11 @@ import kotlin.math.sin
 
 private val Shadow = Color(0xFF472E14)
 
-/** A darker shade of [c] for the mark's sides. */
-private fun side(c: Color) = Color(c.red * 0.55f, c.green * 0.55f, c.blue * 0.5f, 1f)
+/**
+ * The mark's sides: a deeper, warmer shade of the face, so the official amber stays amber
+ * (a rich dark gold, not brown) and other colours keep their own hue.
+ */
+private fun side(c: Color) = Color(c.red * 0.80f, c.green * 0.60f, c.blue * 0.30f, 1f)
 
 /**
  * The official mark standing up off the button like a thick cut-out: a soft shadow cast

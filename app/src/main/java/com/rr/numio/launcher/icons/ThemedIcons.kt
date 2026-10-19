@@ -32,7 +32,7 @@ object ThemedIcons {
     private const val CREAM = 0xFFF6F2E9.toInt()
     private const val OLIVE = 0xFF343E2C.toInt()
     private const val GOLD = 0xFFD4A23A.toInt()
-    private const val SHADOW = 0x5546372A
+    private const val SHADOW = 0x7346372A
     private const val GLYPH_SHADOW = 0x66241A10
 
     private val cache = object : LruCache<String, ImageBitmap>(32 * 1024 * 1024) {
@@ -63,14 +63,14 @@ object ThemedIcons {
         val c = Canvas(bmp)
         val cx = px / 2f
         val r = px * 0.42f
-        val cy = cx - px * 0.025f
+        val cy = cx - px * 0.04f
 
         // About one in three circles is cream, the rest sage, fixed per app.
         // A raised matte disc: soft shadow below, light from the top-left, a fine bevel.
         val fill = if (Math.floorMod(entry.key.hashCode(), 3) == 1) CREAM else SAGE
         c.drawCircle(cx, cy, r, Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = fill
-            setShadowLayer(px * 0.045f, 0f, px * 0.035f, SHADOW)
+            setShadowLayer(px * 0.055f, px * 0.012f, px * 0.05f, SHADOW)
         })
         c.drawCircle(cx, cy, r, Paint(Paint.ANTI_ALIAS_FLAG).apply {
             shader = RadialGradient(
