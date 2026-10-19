@@ -51,6 +51,10 @@
             <category android:name="android.intent.category.APP_CONTACTS" />
         </intent>
         <intent>
+            <action android:name="android.intent.action.INSERT" />
+            <data android:mimeType="vnd.android.cursor.dir/contact" />
+        </intent>
+        <intent>
             <action android:name="android.intent.action.MAIN" />
             <category android:name="android.intent.category.APP_BROWSER" />
         </intent>

@@ -11,8 +11,10 @@ Design rules (shared by every glyph):
     icon) and a lighter second pass that thickens one side in places.
   * Closed shapes overlap their start by a few degrees, or leave one small gap,
     on purpose (where a pen would lift), never at random.
-  * Palette: charcoal ink, warm cream fills, and gold only for one small accent
-    per icon at most (a lens core, a hub, a circled day).
+  * Palette: charcoal ink, warm cream fills, and gold only where it means something
+    (today's date, a phone ringing), never as decoration. Most icons have none.
+  * Every symbol has a cream body under its outline, and round symbols are drawn a
+    little smaller than square ones so they look the same size.
   * Fills sit slightly off the outline (down-right), like colour laid by hand.
   * Pressure: the line swells and thins slowly along its length (0.8x to 1.15x), like a
     brush pen, so no two strokes are the same width all the way.
@@ -99,26 +101,25 @@ GLYPHS["messages"] = [
     ("dot", "INK", 61.5, 43.5, 3.4),
 ]
 
-# Camera: body, viewfinder hump, lens with a gold core, flash dot
+# Camera: body, viewfinder hump, lens with an inner ring, flash dot
 body = ("M24,40 C24,36.5 26.5,34 30,34 L38,34 L41.5,28.5 C42.3,27.3 43.4,26.8 44.8,26.8 L55.2,26.8 "
         "C56.6,26.8 57.7,27.3 58.5,28.5 L62,34 L70,34 C73.5,34 76,36.5 76,40 L76,66 C76,69.5 73.5,72 70,72 "
         "L30,72 C26.5,72 24,69.5 24,66 Z")
 GLYPHS["camera"] = [
     ("fill", "CREAM", body),
     ("ink", body),
-    ("hatch", hatch(60.5, 69)),
+    ("hatch", hatch(59, 67.5)),
     ("ink", arc(50, 52.5, 11.5, -100, 372)),
-    ("dot", "GOLD", 50, 52.5, 5.2),
+    ("thin", "INK", arc(50, 52.5, 4.6, -60, 300)),
     ("dot", "INK", 68, 41.5, 2.2),
 ]
 
-# Settings: a gear with a gold hub
-g = gear(50, 50, 8, 26, 19.5)
+# Settings: a gear with an open hub
+g = gear(50, 50, 8, 25, 18.8)
 GLYPHS["settings"] = [
     ("fill", "CREAM", g),
     ("ink", g),
-    ("dot", "GOLD", 50, 50, 8.2),
-    ("ink", arc(50, 50, 8.2, -120, 368)),
+    ("ink", arc(50, 50, 7.6, -120, 368)),
 ]
 
 # Calendar: a page with two binder rings, a ruled header, and one day circled in gold
@@ -137,32 +138,34 @@ GLYPHS["calendar"] = [
 
 # Browser: a globe, drawn with meridian and parallels
 GLYPHS["browser"] = [
-    ("fill", "CREAM", arc(50, 50, 26, 0, 360) + " Z"),
-    ("ink", arc(50, 50, 26, -80, 368)),
-    ("ink", arc(50, 50, 11, -90, 360, ry=26)),
-    ("thin", "INK", "M24.5,50 L75.5,50"),
-    ("thin", "INK", "M28.5,37 C40,40 60,40 71.5,37"),
-    ("thin", "INK", "M28.5,63 C40,60 60,60 71.5,63"),
+    ("fill", "CREAM", arc(50, 50, 24.5, 0, 360) + " Z"),
+    ("ink", arc(50, 50, 24.5, -80, 368)),
+    ("ink", arc(50, 50, 10.4, -90, 360, ry=24.5)),
+    ("thin", "INK", "M26,50 L74,50"),
+    ("thin", "INK", "M29.8,37.5 C40.5,40.3 59.5,40.3 70.2,37.5"),
+    ("thin", "INK", "M29.8,62.5 C40.5,59.7 59.5,59.7 70.2,62.5"),
 ]
 
 # Contacts: a head and shoulders
 shoulders = "M27,75 C27,62 37,55 50,55 C63,55 73,62 73,75"
 GLYPHS["contacts"] = [
     ("fill", "CREAM", arc(50, 38, 11.5, 0, 360) + " Z"),
+    ("fill", "CREAM", shoulders + " C64,76.5 36,76.5 27,75 Z"),
     ("ink", arc(50, 38, 11.5, -70, 366)),
     ("ink", shoulders),
     ("hatch", hatch(58, 72)),
 ]
 
-# Clock: a face with four ticks, hands at twelve and four, gold centre
+# Clock: a face with four ticks, hands at twelve and four, an inked centre
 GLYPHS["clock"] = [
-    ("fill", "CREAM", arc(50, 50, 26, 0, 360) + " Z"),
-    ("ink", arc(50, 50, 26, -100, 366)),
-    ("thin", "INK", "M50,28.5 L50,32.5"), ("thin", "INK", "M71.5,50 L67.5,50"),
-    ("thin", "INK", "M50,71.5 L50,67.5"), ("thin", "INK", "M28.5,50 L32.5,50"),
-    ("ink", "M50,50 L50,35"),
-    ("ink", "M50,50 L61,56"),
-    ("dot", "GOLD", 50, 50, 3.6),
+    ("fill", "CREAM", arc(50, 50, 24.5, 0, 360) + " Z"),
+    ("ink", arc(50, 50, 24.5, -100, 366)),
+    ("thin", "INK", "M50,30 L50,34"), ("thin", "INK", "M70,50 L66,50"),
+    ("thin", "INK", "M50,70 L50,66"), ("thin", "INK", "M30,50 L34,50"),
+    ("hatch", hatch(33, 62)),
+    ("ink", "M50,50 L50,36"),
+    ("ink", "M50,50 L60.5,56"),
+    ("dot", "INK", 50, 50, 3.2),
 ]
 
 COLOURS = {"INK": 0xFF1C1A17, "CREAM": 0xFFFFF9EE, "GOLD": 0xFFC9962E}
@@ -251,9 +254,9 @@ def wobble(points, seed, amp=0.55):
 
 
 SCALE = 1.55      # the 56-unit content box spans 1.55 x the disc radius
-INK_W = 4.4       # outline width in grid units
-THIN_W = 3.0
-HATCH_W = 2.4
+INK_W = 5.0       # outline width in grid units (+14% after the first phone review)
+THIN_W = 3.4
+HATCH_W = 2.7
 
 
 def pressure(d, seed):

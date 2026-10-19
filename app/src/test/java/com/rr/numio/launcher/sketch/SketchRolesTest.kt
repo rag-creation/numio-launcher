@@ -73,6 +73,15 @@ class SketchRolesTest {
         )
     }
 
+    @Test fun contactsAppsAreFoundByCreateContactToo() {
+        // Fossify Contacts declares no APP_CONTACTS, only "insert a contact"
+        val contacts = SketchRoles.intents()[SketchKind.Contacts].orEmpty()
+        assertTrue(contacts.any { it.action == android.content.Intent.ACTION_INSERT && it.type == "vnd.android.cursor.dir/contact" })
+        // the only app that creates contacts gets the person symbol
+        assertEquals(setOf("org.fossify.contacts"), SketchRoles.choose(listOf(null, "org.fossify.contacts"), listOf(h("org.fossify.contacts", false))))
+        assertEquals(SketchKind.Contacts, SketchRoles.kindFor("org.fossify.contacts", "Contacts", mapOf(SketchKind.Contacts to setOf("org.fossify.contacts"))))
+    }
+
     @Test fun everyJobHasAWayToBeFound() {
         val intents = SketchRoles.intents()
         for (k in SketchKind.entries) assertTrue("$k has no intent", intents[k].orEmpty().isNotEmpty())

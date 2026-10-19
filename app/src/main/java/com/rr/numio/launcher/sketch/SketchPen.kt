@@ -21,9 +21,9 @@ object SketchPen {
 
     /** The 56-unit content box spans this many disc radii. */
     const val SCALE = 1.55f
-    const val INK_W = 4.4f
-    const val THIN_W = 3.0f
-    const val HATCH_W = 2.4f
+    const val INK_W = 5.0f
+    const val THIN_W = 3.4f
+    const val HATCH_W = 2.7f
     private const val STEP = 0.8f        // resample step, in grid units
     private const val WOBBLE = 0.55f     // grid units
     private const val FILL_OFFSET = 1.2f // grid units, down-right

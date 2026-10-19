@@ -8,6 +8,7 @@ import android.provider.Telephony
 import android.telecom.TelecomManager
 import android.net.Uri
 import android.provider.AlarmClock
+import android.provider.ContactsContract
 import android.provider.MediaStore
 import android.provider.Settings
 
@@ -87,7 +88,12 @@ object SketchRoles {
             Intent(Intent.ACTION_VIEW, Uri.parse("https://example.org")).addCategory(Intent.CATEGORY_BROWSABLE),
             Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_APP_BROWSER),
         ),
-        SketchKind.Contacts to listOf(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_APP_CONTACTS)),
+        SketchKind.Contacts to listOf(
+            Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_APP_CONTACTS),
+            // Many contacts apps (Fossify Contacts among them) never declare APP_CONTACTS,
+            // but every one of them offers "create a new contact"; other apps don't.
+            Intent(Intent.ACTION_INSERT).setType(ContactsContract.Contacts.CONTENT_TYPE),
+        ),
         SketchKind.Clock to listOf(Intent(AlarmClock.ACTION_SHOW_ALARMS)),
     )
 
