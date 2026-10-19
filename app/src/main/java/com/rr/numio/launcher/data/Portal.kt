@@ -29,6 +29,7 @@ enum class PortalStyle(val id: String, val label: String) {
     SageCeramic("sage", "Sage ceramic"),
     FloatingCeramic("floating", "Floating"),
     Extruded("extruded", "3D"),
+    Mustard("mustard", "Mustard"),
     Glass("glass", "Glass");
 
     companion object {
