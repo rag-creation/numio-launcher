@@ -242,7 +242,7 @@ GLYPHS["recorder"] = [
 
 # ── one size for all: every drawing fits inside the same inner circle ─────────
 
-FIT_R = 31.0   # grid units from the centre; keeps clear paper between symbol and ring
+FIT_R = 28.0   # grid units from the centre; keeps clear paper between symbol and ring
 
 
 def _scale_path(d, k):
