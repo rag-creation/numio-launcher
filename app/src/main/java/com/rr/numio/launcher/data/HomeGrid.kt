@@ -77,8 +77,12 @@ object HomeGrid {
     fun normalize(saved: List<GridItem>, rows: Int, installed: Set<String>, portal: Boolean = false): List<GridItem> {
         val placed = ArrayList<GridItem>()
         val seen = HashSet<String>()
-        val wanted = widgets.filter { portal || it.id != PORTAL }.map { w -> saved.firstOrNull { it.id == w.id } ?: w } +
-            saved.filter { !it.isWidget && it.id in installed }
+        // What's already placed wins; a widget that's new to this layout (like the portal when a
+        // work profile first appears) takes its default spot only if free, after everything else.
+        val enabled = widgets.filter { portal || it.id != PORTAL }
+        val savedWidgets = enabled.mapNotNull { w -> saved.firstOrNull { it.id == w.id } }
+        val newWidgets = enabled.filter { w -> saved.none { it.id == w.id } }
+        val wanted = savedWidgets + saved.filter { !it.isWidget && it.id in installed } + newWidgets
         for (item in wanted) {
             if (!seen.add(item.id)) continue
             val ok = inBounds(item, rows) && placed.none { it.overlaps(item) }
