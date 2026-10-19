@@ -46,6 +46,21 @@ jobs:
             echo "::error::${line//%/%25}"
           done
 
+      # On failure: the lines that say why (crashes, failed tests), shown on the run page
+      - name: Explain failure
+        if: failure()
+        run: |
+          grep -E "FAILED|Exception|Error:|Caused by|crashed|Process .* finished with non-zero|> Task .* FAILED" build.log \
+            | grep -v "^\s*at " | head -15 | while IFS= read -r line; do
+            echo "::warning::${line//%/%25}"
+          done
+          for f in app/build/test-results/testDebugUnitTest/*.xml; do
+            [ -f "$f" ] || continue
+            grep -A2 "<failure" "$f" | head -6 | tr '\n' ' ' | cut -c1-600 | while IFS= read -r line; do
+              [ -n "$line" ] && echo "::warning::$(basename "$f"): ${line//%/%25}"
+            done
+          done
+
       # One line per test class (tests run, failures, skipped), shown on the run page
       - name: Test summary
         if: always()
