@@ -115,6 +115,24 @@ class SketchRolesTest {
         assertEquals(setOf("ws.xsoh.etar"), SketchRoles.choose(SketchKind.Calendar, listOf(null), listOf(h("ws.xsoh.etar", false)), mapOf("ws.xsoh.etar" to "Etar")))
     }
 
+    @Test fun anAppNamedExactlyForTheJobBeatsOneThatMentionsIt() {
+        val shown = mapOf("org.fossify.gallery" to "Gallery", "com.google.ai.edge.gallery" to "Edge Gallery", "app.kaii.photos" to "Photos")
+        assertEquals(
+            setOf("org.fossify.gallery"),
+            SketchRoles.choose(
+                SketchKind.Gallery, listOf("android"),
+                listOf(h("org.fossify.gallery", false), h("com.google.ai.edge.gallery", false), h("app.kaii.photos", false)),
+                shown,
+            ),
+        )
+        // several mail apps and no default: none is singled out, each keeps its own look
+        val mail = mapOf("com.fsck.k9" to "K-9 Mail", "ch.protonmail.android" to "Proton Mail", "de.tutao.tutanota" to "Tuta")
+        assertEquals(
+            emptySet<String>(),
+            SketchRoles.choose(SketchKind.Email, listOf("android"), mail.keys.map { h(it, false) }, mail),
+        )
+    }
+
     @Test fun everyJobHasAWayToBeFound() {
         val intents = SketchRoles.intents()
         for (k in SketchKind.entries) assertTrue("$k has no intent", intents[k].orEmpty().isNotEmpty())

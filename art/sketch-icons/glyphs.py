@@ -13,8 +13,9 @@ Design rules (shared by every glyph):
     on purpose (where a pen would lift), never at random.
   * Palette: charcoal ink, warm cream fills, and gold only where it means something
     (today's date, a phone ringing), never as decoration. Most icons have none.
-  * Every symbol has a cream body under its outline, and round symbols are drawn a
-    little smaller than square ones so they look the same size.
+  * Every symbol has a cream body under its outline where it has a body, and every
+    symbol fits inside one inner circle (FIT_R), so none crowds the ring; round
+    symbols are drawn a little smaller than square ones so they look the same size.
   * Fills sit slightly off the outline (down-right), like colour laid by hand.
   * Pressure: the line swells and thins slowly along its length (0.8x to 1.15x), like a
     brush pen, so no two strokes are the same width all the way.
@@ -168,6 +169,114 @@ GLYPHS["clock"] = [
     ("dot", "INK", 50, 50, 3.2),
 ]
 
+# ── second set ────────────────────────────────────────────────────────────
+
+# Files: a folder with its tab, a sheet peeking out
+folder = ("M24,35 C24,31.5 26.2,29.5 29.5,29.5 L41.5,29.5 C43,29.5 44.2,30.1 45.1,31.2 L48,35 L70.5,35 "
+          "C73.8,35 76,37.2 76,40.5 L76,67.5 C76,70.8 73.8,73 70.5,73 L29.5,73 C26.2,73 24,70.8 24,67.5 Z")
+GLYPHS["files"] = [
+    ("fill", "CREAM", folder),
+    ("ink", folder),
+    ("thin", "INK", "M24.5,44.5 L75.5,44.5"),
+    ("hatch", hatch(59, 69.5)),
+]
+
+# Gallery: a framed picture with hills and the sun (gold: it is the sun)
+frame = rrect(24, 28, 76, 72, 6)
+GLYPHS["gallery"] = [
+    ("fill", "CREAM", frame),
+    ("ink", frame),
+    ("ink", "M26,66 L40,50 L49.5,60 L57,52.5 L74.5,68"),
+    ("dot", "GOLD", 62, 40, 4.6),
+    ("hatch", hatch(29, 70)),
+]
+
+# Music: two beamed notes
+GLYPHS["music"] = [
+    ("ink", "M41,63 L41,31 L67,25 L67,57"),
+    ("ink", "M41,38.5 L67,32.5"),
+    ("dot", "INK", 35, 63.5, 6.6),
+    ("dot", "INK", 61, 57.5, 6.6),
+]
+
+# Mail: an envelope with its flap
+envelope = rrect(23, 31, 77, 70, 5)
+GLYPHS["email"] = [
+    ("fill", "CREAM", envelope),
+    ("ink", envelope),
+    ("ink", "M25,34 L50,53.5 L75,34"),
+    ("hatch", hatch(59, 67)),
+]
+
+# Maps: a location pin
+pin = ("M50,77 C44.5,67 31,56 31,43 C31,32.5 39.5,24 50,24 C60.5,24 69,32.5 69,43 "
+       "C69,56 55.5,67 50,77 Z")
+GLYPHS["maps"] = [
+    ("fill", "CREAM", pin),
+    ("ink", pin),
+    ("ink", arc(50, 43, 7.5, -110, 368)),
+    ("hatch", hatch(54, 62)),
+]
+
+# Calculator: a body, its display and nine keys
+calc = rrect(29, 23, 71, 77, 6)
+GLYPHS["calculator"] = [
+    ("fill", "CREAM", calc),
+    ("ink", calc),
+    ("thin", "INK", rrect(35.5, 29.5, 64.5, 40.5, 2.5)),
+    ("dot", "INK", 39.5, 50.5, 2.7), ("dot", "INK", 50, 50.5, 2.7), ("dot", "INK", 60.5, 50.5, 2.7),
+    ("dot", "INK", 39.5, 60.5, 2.7), ("dot", "INK", 50, 60.5, 2.7), ("dot", "INK", 60.5, 60.5, 2.7),
+    ("dot", "INK", 39.5, 70.5, 2.7), ("dot", "INK", 50, 70.5, 2.7), ("dot", "INK", 60.5, 70.5, 2.7),
+]
+
+# Voice recorder: a microphone on its stand
+mic = rrect(41, 23, 59, 55, 9)
+GLYPHS["recorder"] = [
+    ("fill", "CREAM", mic),
+    ("ink", mic),
+    ("ink", "M32.5,45 C32.5,56.5 40.5,64 50,64 C59.5,64 67.5,56.5 67.5,45"),
+    ("ink", "M50,64.5 L50,73"),
+    ("ink", "M40.5,74.5 L59.5,74.5"),
+    ("hatch", hatch(50, 51, 2, 6, 4.4)),
+]
+
+# ── one size for all: every drawing fits inside the same inner circle ─────────
+
+FIT_R = 31.0   # grid units from the centre; keeps clear paper between symbol and ring
+
+
+def _scale_path(d, k):
+    def sc(m):
+        x, y = float(m.group(1)), float(m.group(2))
+        return f"{f(50 + (x - 50) * k)},{f(50 + (y - 50) * k)}"
+    return re.sub(r"(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)", sc, d)
+
+
+def fit_all():
+    for name, layers in GLYPHS.items():
+        far = 0.0
+        for L in layers:
+            if L[0] == "dot":
+                far = max(far, math.hypot(L[2] - 50, L[3] - 50) + L[4])
+                continue
+            d = L[1] if L[0] in ("ink", "hatch") else L[2]
+            for c in parse(d):
+                for x, y in c:
+                    far = max(far, math.hypot(x - 50, y - 50))
+        if far <= FIT_R:
+            continue
+        k = FIT_R / far
+        out = []
+        for L in layers:
+            if L[0] == "dot":
+                out.append(("dot", L[1], 50 + (L[2] - 50) * k, 50 + (L[3] - 50) * k, L[4] * k))
+            elif L[0] in ("ink", "hatch"):
+                out.append((L[0], _scale_path(L[1], k)))
+            else:
+                out.append((L[0], L[1], _scale_path(L[2], k)))
+        GLYPHS[name] = out
+
+
 COLOURS = {"INK": 0xFF1C1A17, "CREAM": 0xFFFFF9EE, "GOLD": 0xFFC9962E}
 PAPER = 0xFFF6ECD6
 
@@ -187,7 +296,7 @@ def kotlin():
             elif L[0] == "hatch":
                 items.append(f'Layer.Hatch("{L[1]}")')
             elif L[0] == "dot":
-                items.append(f"Layer.Dot(Tone.{L[1]}, {L[2]}f, {L[3]}f, {L[4]}f)")
+                items.append(f"Layer.Dot(Tone.{L[1]}, {f(L[2])}f, {f(L[3])}f, {f(L[4])}f)")
         body = ",\n            ".join(items)
         lines.append(f"        SketchKind.{name.capitalize()} to listOf(\n            {body},\n        ),")
     return "\n".join(lines)
@@ -344,6 +453,8 @@ KT_FOOTER = """
 }
 """
 
+
+fit_all()
 
 if __name__ == "__main__":
     here = os.path.dirname(os.path.abspath(__file__))

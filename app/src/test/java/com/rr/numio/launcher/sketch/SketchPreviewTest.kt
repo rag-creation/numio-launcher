@@ -57,8 +57,11 @@ class SketchPreviewTest {
         "Phone" to SketchKind.Phone, "Messages" to SketchKind.Messages, "Camera" to SketchKind.Camera,
         "Settings" to SketchKind.Settings, "Calendar" to SketchKind.Calendar, "Internet" to SketchKind.Browser,
         "Contacts" to SketchKind.Contacts, "Clock" to SketchKind.Clock,
+        "Files" to SketchKind.Files, "Gallery" to SketchKind.Gallery, "Music" to SketchKind.Music,
+        "Mail" to SketchKind.Email, "Maps" to SketchKind.Maps, "Calculator" to SketchKind.Calculator,
+        "Recorder" to SketchKind.Recorder,
         // apps without a symbol yet: the existing hand-drawn letter fallback
-        "WhatsApp" to null, "Gallery" to null, "Spotify" to null, "Notes" to null,
+        "WhatsApp" to null, "Spotify" to null, "Notes" to null, "Telegram" to null,
     )
 
     private fun label(c: Canvas, text: String, cx: Float, y: Float, size: Float) {

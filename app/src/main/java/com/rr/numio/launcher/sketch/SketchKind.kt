@@ -22,15 +22,25 @@ enum class SketchKind(
     /** Words in an app's name that point to this kind, used only to split one package that
      *  offers two of them (e.g. a "Phone" and a "Contacts" icon from the same app). */
     val words: List<String>,
+    /** Whole names that say exactly this ("Gallery", "My Files"); they win over a mere
+     *  mention ("Edge Gallery") when several apps do the same job. */
+    val titles: List<String> = emptyList(),
 ) {
-    Phone(listOf("phone", "dial", "call")),
-    Messages(listOf("message", "sms", "chat")),
-    Camera(listOf("camera")),
-    Settings(listOf("setting")),
-    Calendar(listOf("calendar")),
-    Browser(listOf("browser", "internet", "web")),
-    Contacts(listOf("contact", "people")),
-    Clock(listOf("clock", "alarm")),
+    Phone(listOf("phone", "dial", "call"), listOf("phone")),
+    Messages(listOf("message", "sms", "chat"), listOf("messages", "messaging")),
+    Camera(listOf("camera"), listOf("camera")),
+    Settings(listOf("setting"), listOf("settings")),
+    Calendar(listOf("calendar"), listOf("calendar")),
+    Browser(listOf("browser", "internet", "web"), listOf("browser", "internet")),
+    Contacts(listOf("contact", "people"), listOf("contacts")),
+    Clock(listOf("clock", "alarm"), listOf("clock")),
+    Files(listOf("file"), listOf("files", "my files", "file manager")),
+    Gallery(listOf("gallery", "photo"), listOf("gallery")),
+    Music(listOf("music"), listOf("music")),
+    Email(listOf("mail"), listOf("email", "mail")),
+    Maps(listOf("map"), listOf("maps")),
+    Calculator(listOf("calculator", "calc"), listOf("calculator")),
+    Recorder(listOf("recorder", "recording"), listOf("voice recorder", "recorder", "sound recorder")),
 }
 
 /** Colours a glyph may use. Charcoal ink, warm cream and a little gold, nothing else. */
@@ -97,7 +107,23 @@ object SketchRoles {
             Intent(Intent.ACTION_INSERT).setType(ContactsContract.Contacts.CONTENT_TYPE),
         ),
         SketchKind.Clock to listOf(Intent(AlarmClock.ACTION_SHOW_ALARMS)),
+        SketchKind.Files to listOf(Intent(Intent.ACTION_MAIN).addCategory(CATEGORY_APP_FILES)),
+        SketchKind.Gallery to listOf(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_APP_GALLERY)),
+        SketchKind.Music to listOf(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_APP_MUSIC)),
+        SketchKind.Email to listOf(
+            Intent(Intent.ACTION_SENDTO, Uri.parse("mailto:")),
+            Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_APP_EMAIL),
+        ),
+        SketchKind.Maps to listOf(
+            Intent(Intent.ACTION_VIEW, Uri.parse("geo:0,0?q=0,0")),
+            Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_APP_MAPS),
+        ),
+        SketchKind.Calculator to listOf(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_APP_CALCULATOR)),
+        SketchKind.Recorder to listOf(Intent(MediaStore.Audio.Media.RECORD_SOUND_ACTION)),
     )
+
+    /** Intent.CATEGORY_APP_FILES (Android 10), spelled out for older phones. */
+    private const val CATEGORY_APP_FILES = "android.intent.category.APP_FILES"
 
     /** One app that can do a job: its package and whether it came with the phone. */
     data class Handler(val packageName: String, val preinstalled: Boolean)
@@ -107,8 +133,9 @@ object SketchRoles {
      * ([shown]: package to its name there), so a hidden or half-removed app never takes
      * the symbol from the one you use. In order:
      *  1. your chosen default;
-     *  2. else, of the apps that do the job, the single one whose name says what it is
-     *     (Fossify Contacts is "Contacts"; a messenger that can also add contacts isn't);
+     *  2. else, of the apps that do the job, the single one named exactly for it
+     *     ("Gallery"), or else the single one whose name mentions it (Fossify Contacts is
+     *     "Contacts"; a messenger that can also add contacts isn't);
      *  3. else the preinstalled ones;
      *  4. else the only app that does the job.
      * "android" (the app chooser) is never a choice.
@@ -124,7 +151,10 @@ object SketchRoles {
         if (chosen.isNotEmpty()) return chosen
         val real = handlers.filter { visible(it.packageName) }
         val all = real.map { it.packageName }.toSet()
-        val named = all.filter { p -> shown?.get(p)?.lowercase()?.let { n -> kind.words.any { it in n } } == true }
+        val name = { p: String -> shown?.get(p)?.trim()?.lowercase() }
+        val titled = all.filter { p -> name(p)?.let { it in kind.titles } == true }
+        if (titled.size == 1) return titled.toSet()
+        val named = all.filter { p -> name(p)?.let { n -> kind.words.any { it in n } } == true }
         if (named.size == 1) return named.toSet()
         val preinstalled = real.filter { it.preinstalled }.map { it.packageName }.toSet()
         if (preinstalled.isNotEmpty()) return preinstalled
