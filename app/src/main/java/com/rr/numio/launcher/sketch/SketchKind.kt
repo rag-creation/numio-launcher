@@ -19,6 +19,8 @@ import android.provider.Settings
  * Everything else keeps the fallback: its monochrome layer, or a hand-drawn letter.
  */
 enum class SketchKind(
+    /** Shown in the "Sketch icon" picker. */
+    val label: String,
     /** Words in an app's name that point to this kind, used only to split one package that
      *  offers two of them (e.g. a "Phone" and a "Contacts" icon from the same app). */
     val words: List<String>,
@@ -26,21 +28,21 @@ enum class SketchKind(
      *  mention ("Edge Gallery") when several apps do the same job. */
     val titles: List<String> = emptyList(),
 ) {
-    Phone(listOf("phone", "dial", "call"), listOf("phone")),
-    Messages(listOf("message", "sms", "chat"), listOf("messages", "messaging")),
-    Camera(listOf("camera"), listOf("camera")),
-    Settings(listOf("setting"), listOf("settings")),
-    Calendar(listOf("calendar"), listOf("calendar")),
-    Browser(listOf("browser", "internet", "web"), listOf("browser", "internet")),
-    Contacts(listOf("contact", "people"), listOf("contacts")),
-    Clock(listOf("clock", "alarm"), listOf("clock")),
-    Files(listOf("file"), listOf("files", "my files", "file manager")),
-    Gallery(listOf("gallery", "photo"), listOf("gallery")),
-    Music(listOf("music"), listOf("music")),
-    Email(listOf("mail"), listOf("email", "mail")),
-    Maps(listOf("map"), listOf("maps")),
-    Calculator(listOf("calculator", "calc"), listOf("calculator")),
-    Recorder(listOf("recorder", "recording"), listOf("voice recorder", "recorder", "sound recorder")),
+    Phone("Phone", listOf("phone", "dial", "call"), listOf("phone")),
+    Messages("Messages", listOf("message", "sms", "chat"), listOf("messages", "messaging")),
+    Camera("Camera", listOf("camera"), listOf("camera")),
+    Settings("Settings", listOf("setting"), listOf("settings")),
+    Calendar("Calendar", listOf("calendar"), listOf("calendar")),
+    Browser("Browser", listOf("browser", "internet", "web"), listOf("browser", "internet")),
+    Contacts("Contacts", listOf("contact", "people"), listOf("contacts")),
+    Clock("Clock", listOf("clock", "alarm"), listOf("clock")),
+    Files("Files", listOf("file"), listOf("files", "my files", "file manager")),
+    Gallery("Gallery", listOf("gallery", "photo"), listOf("gallery")),
+    Music("Music", listOf("music"), listOf("music")),
+    Email("Mail", listOf("mail"), listOf("email", "mail")),
+    Maps("Maps", listOf("map"), listOf("maps")),
+    Calculator("Calculator", listOf("calculator", "calc"), listOf("calculator")),
+    Recorder("Recorder", listOf("recorder", "recording"), listOf("voice recorder", "recorder", "sound recorder")),
 }
 
 /** Colours a glyph may use. Charcoal ink, warm cream and a little gold, nothing else. */

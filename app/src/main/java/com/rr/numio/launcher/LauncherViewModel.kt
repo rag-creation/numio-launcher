@@ -317,8 +317,14 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
             .flowOn(Dispatchers.Default)
             .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
+    /** Ink: pick an app's sketch icon by hand (a [SketchKind] name or [SketchChoices.OWN]); null = automatic. */
+    fun setSketchIcon(entry: AppEntry, choice: String?) {
+        viewModelScope.launch { prefs.setSketchChoice(entry.key, choice) }
+    }
+
     init {
         repo.start()
+        viewModelScope.launch { prefs.sketchChoices.collect { com.rr.numio.launcher.sketch.SketchChoices.update(it) } }
         // First run: fill the dock with the phone's own dialer, messages, browser and camera
         viewModelScope.launch {
             val all = repo.apps.filterNotNull().first()

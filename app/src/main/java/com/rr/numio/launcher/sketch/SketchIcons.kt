@@ -41,7 +41,8 @@ object SketchIcons {
         override fun sizeOf(key: String, value: ImageBitmap) = value.width * value.height * 4
     }
 
-    private fun cacheKey(entry: AppEntry, px: Int) = "${entry.key}@$px"
+    // The hand-picked choice is part of the key, so picking another drawing draws it again
+    private fun cacheKey(entry: AppEntry, px: Int) = "${entry.key}@$px~${SketchChoices.current[entry.key].orEmpty()}"
 
     fun cached(entry: AppEntry, px: Int): ImageBitmap? = cache.get(cacheKey(entry, px))
 
@@ -59,12 +60,24 @@ object SketchIcons {
 
     private fun render(context: Context, entry: AppEntry, px: Int): Bitmap {
         val bmp = Bitmap.createBitmap(px, px, Bitmap.Config.ARGB_8888)
-        val kind = SketchRoles.kindFor(entry.packageName, entry.label, SketchRoles.roles(context))
+        val kind = SketchChoices.decide(SketchChoices.current[entry.key]) { automatic(context, entry) }
         paint(context, Canvas(bmp), px, entry.key.hashCode(), entry.label, kind, entry.isMainUser) {
             MonoLayer.of(entry)
         }
         return bmp
     }
+
+    /** The drawing the automatic rules give [entry] (null: its own look). */
+    fun automatic(context: Context, entry: AppEntry): SketchKind? =
+        SketchRoles.kindFor(entry.packageName, entry.label, SketchRoles.roles(context))
+
+    /** [entry] drawn with [kind] (null: its own look), uncached: for the picker's previews. */
+    suspend fun preview(context: Context, entry: AppEntry, px: Int, kind: SketchKind?): ImageBitmap =
+        withContext(Dispatchers.Default) {
+            val bmp = Bitmap.createBitmap(px, px, Bitmap.Config.ARGB_8888)
+            paint(context, Canvas(bmp), px, entry.key.hashCode(), entry.label, kind, entry.isMainUser) { MonoLayer.of(entry) }
+            bmp.asImageBitmap()
+        }
 
     /**
      * One icon, [px] square, onto [c]: paper disc, then the [kind]'s sketch symbol, else the

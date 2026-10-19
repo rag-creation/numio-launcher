@@ -51,6 +51,7 @@ import com.rr.numio.launcher.LauncherViewModel
 import com.rr.numio.launcher.data.AppEntry
 import com.rr.numio.launcher.data.Slot
 import com.rr.numio.launcher.icons.ThemedIcons
+import com.rr.numio.launcher.sketch.SketchChoices
 import com.rr.numio.launcher.sketch.SketchIcons
 
 /** Ink draws its own sketch icon; Sol draws the app's themed icon on a sage or cream circle. */
@@ -58,11 +59,11 @@ import com.rr.numio.launcher.sketch.SketchIcons
 fun AppIcon(entry: AppEntry, size: Dp, modifier: Modifier = Modifier, sketch: Boolean = true) {
     val context = LocalContext.current
     val px = with(LocalDensity.current) { size.roundToPx() }
+    // Ink: redraw when a sketch icon is picked by hand
+    val picks = if (sketch) SketchChoices.version.intValue else 0
     val start = if (sketch) SketchIcons.cached(entry, px) else ThemedIcons.cached(entry, px)
-    val bitmap: ImageBitmap? by produceState(start, entry.key, px, sketch) {
-        if (value == null) {
-            value = if (sketch) SketchIcons.load(context, entry, px) else ThemedIcons.load(entry, px)
-        }
+    val bitmap: ImageBitmap? by produceState(start, entry.key, px, sketch, picks) {
+        value = if (sketch) SketchIcons.load(context, entry, px) else ThemedIcons.load(entry, px)
     }
     Box(modifier.size(size)) {
         bitmap?.let { Image(it, contentDescription = null, modifier = Modifier.fillMaxSize()) }
@@ -94,6 +95,10 @@ fun AppTile(
     val haptics = LocalHapticFeedback.current
     var bounds by remember { mutableStateOf(ComposeRect.Zero) }
     var menu by remember { mutableStateOf(false) }
+    var picker by remember { mutableStateOf(false) }
+    if (picker) {
+        SketchIconDialog(entry, onPick = { vm.setSketchIcon(entry, it); picker = false }, onDismiss = { picker = false })
+    }
 
     val open = {
         val r = Rect(bounds.left.toInt(), bounds.top.toInt(), bounds.right.toInt(), bounds.bottom.toInt())
@@ -205,6 +210,9 @@ fun AppTile(
                     if (inDock) vm.removeFromDock(entry) else vm.addToDock(entry)
                 },
             )
+            if (colors.sketch) {
+                DropdownMenuItem(text = { Text("Sketch icon…") }, onClick = { menu = false; picker = true })
+            }
             DropdownMenuItem(text = { Text("App info") }, onClick = { menu = false; vm.openAppInfo(entry) })
             DropdownMenuItem(text = { Text("Uninstall") }, onClick = { menu = false; vm.uninstall(entry) })
         }

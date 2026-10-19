@@ -5,6 +5,7 @@ import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import com.rr.numio.launcher.sketch.SketchChoices
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
@@ -67,6 +68,18 @@ class HomePrefs(context: Context) {
             it[PORTAL_COLOR] = s.color.id
             it[PORTAL_STYLE] = s.style.id
             it[PORTAL_APPS] = s.apps.joinToString("\n")
+        }
+    }
+
+    /** Ink: sketch icons picked by hand, app key to choice (see [SketchChoices]). */
+    val sketchChoices: Flow<Map<String, String>> = store.data.map { p -> SketchChoices.parse(p[SKETCH_ICONS]) }
+
+    /** Sets one app's pick; null goes back to automatic. */
+    suspend fun setSketchChoice(appKey: String, choice: String?) {
+        store.edit {
+            val all = SketchChoices.parse(it[SKETCH_ICONS]).toMutableMap()
+            if (choice == null) all.remove(appKey) else all[appKey] = choice
+            if (all.isEmpty()) it.remove(SKETCH_ICONS) else it[SKETCH_ICONS] = SketchChoices.serialize(all)
         }
     }
 
@@ -148,5 +161,6 @@ class HomePrefs(context: Context) {
         private val PORTAL_COLOR = stringPreferencesKey("portal_color")
         private val PORTAL_APPS = stringPreferencesKey("portal_apps")
         private val PORTAL_STYLE = stringPreferencesKey("portal_style")
+        private val SKETCH_ICONS = stringPreferencesKey("sketch_icons")
     }
 }
