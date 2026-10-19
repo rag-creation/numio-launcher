@@ -7,7 +7,9 @@ import androidx.lifecycle.viewModelScope
 import com.rr.numio.launcher.data.AppEntry
 import com.rr.numio.launcher.data.AppRepository
 import com.rr.numio.launcher.data.Background
+import com.rr.numio.launcher.data.Cells
 import com.rr.numio.launcher.data.DefaultDock
+import com.rr.numio.launcher.data.Slot
 import com.rr.numio.launcher.data.HomePrefs
 import com.rr.numio.launcher.data.HomeTheme
 import com.rr.numio.launcher.data.SolClock
@@ -22,6 +24,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -81,49 +84,46 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
     val background: StateFlow<Background> =
         prefs.background.stateIn(viewModelScope, SharingStarted.Eagerly, Background.Paper)
 
+    private fun cellsOf(keys: kotlinx.coroutines.flow.Flow<List<String?>>, size: Int): StateFlow<List<AppEntry?>> =
+        combine(repo.apps.filterNotNull(), keys) { apps, k ->
+            val byKey = apps.associateBy { it.key }
+            // an uninstalled app's cell simply shows as empty
+            Cells.pad(k, size).map { key -> key?.let(byKey::get) }
+        }.stateIn(viewModelScope, SharingStarted.Eagerly, List(size) { null })
+
+    /** Sol's dock: [HomePrefs.DOCK_MAX] fixed cells, some may be empty. */
+    val dockCells: StateFlow<List<AppEntry?>> = cellsOf(prefs.dock.map { it.orEmpty() }, HomePrefs.DOCK_MAX)
+
+    /** Ink's dock: the same apps with the gaps closed up. */
     val dock: StateFlow<List<AppEntry>> =
-        combine(repo.apps.filterNotNull(), prefs.dock) { apps, keys ->
-            val byKey = apps.associateBy { it.key }
-            keys.orEmpty().mapNotNull { byKey[it] }
-        }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+        dockCells.map { it.filterNotNull() }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
-    /** Apps on Sol's home rows (uninstalled ones simply drop out). */
-    val homeApps: StateFlow<List<AppEntry>> =
-        combine(repo.apps.filterNotNull(), prefs.homeApps) { apps, keys ->
-            val byKey = apps.associateBy { it.key }
-            keys.mapNotNull { byKey[it] }
-        }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+    /** Sol's home: two rows of five fixed cells. */
+    val homeCells: StateFlow<List<AppEntry?>> = cellsOf(prefs.homeApps, HomePrefs.HOME_MAX)
 
-    fun isOnHome(entry: AppEntry) = homeApps.value.any { it.key == entry.key }
+    private fun keys(cells: List<AppEntry?>) = cells.map { it?.key }
+
+    fun isOnHome(entry: AppEntry) = homeCells.value.any { it?.key == entry.key }
 
     fun addToHome(entry: AppEntry) {
-        val current = homeApps.value.map { it.key }
-        if (entry.key in current) return
-        if (current.size >= HomePrefs.HOME_MAX) {
-            Toast.makeText(getApplication(), "Home holds ${HomePrefs.HOME_MAX} apps", Toast.LENGTH_SHORT).show()
+        val cells = keys(homeCells.value)
+        if (entry.key in cells) return
+        val i = Cells.firstEmpty(cells)
+        if (i < 0) {
+            Toast.makeText(getApplication(), "Home is full. Remove an app first", Toast.LENGTH_SHORT).show()
             return
         }
-        viewModelScope.launch { prefs.setHomeApps(current + entry.key) }
-    }
-
-    /** Drag-to-rearrange on Sol's home rows. */
-    fun moveHome(from: Int, to: Int) {
-        val keys = homeApps.value.map { it.key }.toMutableList()
-        if (from !in keys.indices || to !in keys.indices) return
-        keys.add(to, keys.removeAt(from))
-        viewModelScope.launch { prefs.setHomeApps(keys) }
-    }
-
-    /** Drag-to-rearrange in the dock. */
-    fun moveDock(from: Int, to: Int) {
-        val keys = dock.value.map { it.key }.toMutableList()
-        if (from !in keys.indices || to !in keys.indices) return
-        keys.add(to, keys.removeAt(from))
-        viewModelScope.launch { prefs.setDock(keys) }
+        viewModelScope.launch { prefs.setHomeApps(cells.toMutableList().also { it[i] = entry.key }) }
     }
 
     fun removeFromHome(entry: AppEntry) {
-        viewModelScope.launch { prefs.setHomeApps(homeApps.value.map { it.key } - entry.key) }
+        viewModelScope.launch { prefs.setHomeApps(keys(homeCells.value).map { if (it == entry.key) null else it }) }
+    }
+
+    /** Drag on Sol's home or dock: into an empty cell it moves, onto an app they swap. */
+    fun drop(from: Slot, to: Slot) {
+        val (home, dock) = Cells.move(keys(homeCells.value), keys(dockCells.value), from, to)
+        viewModelScope.launch { prefs.setCells(home, dock) }
     }
 
     /** Search results; with no query, every app A–Z. */
@@ -183,17 +183,18 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
     fun isInDock(entry: AppEntry) = dock.value.any { it.key == entry.key }
 
     fun addToDock(entry: AppEntry) {
-        val current = dock.value.map { it.key }
+        val current = keys(dockCells.value)
         if (entry.key in current) return
-        if (current.size >= HomePrefs.DOCK_MAX) {
+        val i = Cells.firstEmpty(current)
+        if (i < 0) {
             Toast.makeText(getApplication(), "The dock holds ${HomePrefs.DOCK_MAX} apps", Toast.LENGTH_SHORT).show()
             return
         }
-        viewModelScope.launch { prefs.setDock(current + entry.key) }
+        viewModelScope.launch { prefs.setDock(current.toMutableList().also { it[i] = entry.key }) }
     }
 
     fun removeFromDock(entry: AppEntry) {
-        viewModelScope.launch { prefs.setDock(dock.value.map { it.key } - entry.key) }
+        viewModelScope.launch { prefs.setDock(keys(dockCells.value).map { if (it == entry.key) null else it }) }
     }
 
     fun launch(entry: AppEntry, bounds: android.graphics.Rect?, options: android.os.Bundle?) =

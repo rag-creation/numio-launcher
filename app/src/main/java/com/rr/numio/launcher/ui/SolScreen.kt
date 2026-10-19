@@ -35,6 +35,7 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -72,6 +73,7 @@ import com.rr.numio.launcher.LauncherViewModel
 import com.rr.numio.launcher.R
 import com.rr.numio.launcher.ShelfMode
 import com.rr.numio.launcher.data.AppEntry
+import com.rr.numio.launcher.data.Slot
 import com.rr.numio.launcher.data.SolClock
 import com.rr.numio.launcher.data.SolWallpaper
 import java.text.SimpleDateFormat
@@ -104,8 +106,16 @@ fun SolScreen(
     modifier: Modifier = Modifier,
 ) {
     val colors = SolColors
-    val homeApps by vm.homeApps.collectAsStateWithLifecycle()
-    val dock by vm.dock.collectAsStateWithLifecycle()
+    val homeCells by vm.homeCells.collectAsStateWithLifecycle()
+    val dockCells by vm.dockCells.collectAsStateWithLifecycle()
+    // One drag-and-drop for home and dock, so apps can move between them
+    val placement = rememberPlacement(vm::drop)
+    val haptics = LocalHapticFeedback.current
+    LaunchedEffect(placement.target) {
+        if (placement.dragging != null && placement.target != placement.dragging) {
+            haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+        }
+    }
     val isDefault by vm.isDefaultHome.collectAsStateWithLifecycle()
     val showCalendar by vm.showCalendar.collectAsStateWithLifecycle()
     val wallpaper by vm.solWallpaper.collectAsStateWithLifecycle()
@@ -183,9 +193,16 @@ fun SolScreen(
                     modifier = Modifier.weight(1f).fillMaxWidth(),
                 )
 
-                HomeRows(vm, colors, homeApps)
+                // whichever group holds the lifted app is drawn on top, so it passes over the other
+                HomeGrid(
+                    vm, colors, homeCells, placement,
+                    Modifier.zIndex(if (placement.dragging?.area == Slot.HOME) 1f else 0f),
+                )
                 Spacer(Modifier.height(14.dp))
-                SolDock(vm, colors, dock)
+                SolDock(
+                    vm, colors, dockCells, placement,
+                    Modifier.zIndex(if (placement.dragging?.area == Slot.DOCK) 1f else 0f),
+                )
                 Spacer(Modifier.height(16.dp))
                 SolSearchPill(colors) { vm.openShelf(ShelfMode.Search) }
                 Spacer(Modifier.height(14.dp))
@@ -387,59 +404,81 @@ private fun SolMenuArea(
     }
 }
 
-/** Sol's home rows: up to two rows of five apps you place with "Add to home". */
+/** One row of cells (home or dock). Empty cells take drops; the target gets a gold ring. */
 @Composable
-private fun HomeRows(vm: LauncherViewModel, colors: NumioColors, apps: List<AppEntry>) {
-    if (apps.isEmpty()) {
-        Text(
-            "Long-press any app, then Add to home",
-            style = TextStyle(color = colors.inkSoft, fontSize = 13.sp),
-            modifier = Modifier
-                .background(colors.card.copy(alpha = 0.78f), RoundedCornerShape(14.dp))
-                .padding(horizontal = 14.dp, vertical = 10.dp),
-        )
-        return
-    }
-    val reorder = rememberReorder(vm::moveHome)
-    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        apps.chunked(5).forEachIndexed { r, row ->
-            // the row holding a lifted icon is drawn on top, so the icon passes over the other row
-            val liftedHere = reorder.dragging in (r * 5) until (r * 5 + row.size)
-            // five equal slots, so rows line up in columns even when a row isn't full
-            Row(Modifier.fillMaxWidth().zIndex(if (liftedHere) 1f else 0f)) {
-                row.forEachIndexed { c, entry ->
-                    Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
-                        AppTile(
-                            entry, vm, colors, iconSize = 56.dp, showLabel = false,
-                            modifier = Modifier.width(64.dp),
-                            reorder = reorder, index = r * 5 + c,
-                        )
+private fun CellRow(
+    vm: LauncherViewModel,
+    colors: NumioColors,
+    cells: List<AppEntry?>,
+    area: Int,
+    first: Int,
+    placement: Placement,
+    modifier: Modifier = Modifier,
+) {
+    Row(modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        cells.forEachIndexed { c, entry ->
+            val slot = Slot(area, first + c)
+            Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                if (entry != null) {
+                    AppTile(
+                        entry, vm, colors, iconSize = 56.dp, showLabel = false,
+                        modifier = Modifier.width(64.dp),
+                        placement = placement, slot = slot,
+                    )
+                } else {
+                    Box(
+                        Modifier.width(64.dp).height(68.dp).dropCell(placement, slot),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        if (placement.isTarget(slot)) {
+                            Box(Modifier.size(56.dp).border(2.dp, colors.gold, CircleShape))
+                        }
                     }
                 }
-                repeat(5 - row.size) { Spacer(Modifier.weight(1f)) }
             }
         }
     }
 }
 
-/** The same dock as Ink, with Sol's themed icons. */
+/** Sol's home: two rows of five cells. Add apps with "Add to home", then drag them anywhere. */
 @Composable
-private fun SolDock(vm: LauncherViewModel, colors: NumioColors, dock: List<AppEntry>) {
-    if (dock.isEmpty()) return
-    Row(
-        horizontalArrangement = Arrangement.SpaceEvenly,
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier.fillMaxWidth(),
-    ) {
-        val reorder = rememberReorder(vm::moveDock)
-        dock.forEachIndexed { i, entry ->
-            AppTile(
-                entry, vm, colors, iconSize = 56.dp, showLabel = false,
-                modifier = Modifier.width(64.dp),
-                reorder = reorder, index = i,
+private fun HomeGrid(
+    vm: LauncherViewModel,
+    colors: NumioColors,
+    cells: List<AppEntry?>,
+    placement: Placement,
+    modifier: Modifier = Modifier,
+) {
+    Box(modifier, contentAlignment = Alignment.Center) {
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            cells.chunked(5).forEachIndexed { r, row ->
+                // the row holding the lifted app is drawn on top, so it passes over the other row
+                val liftedHere = placement.dragging?.let { it.area == Slot.HOME && it.index / 5 == r } == true
+                CellRow(vm, colors, row, Slot.HOME, r * 5, placement, Modifier.zIndex(if (liftedHere) 1f else 0f))
+            }
+        }
+        if (cells.all { it == null } && placement.dragging == null) {
+            Text(
+                "Long-press any app, then Add to home",
+                style = TextStyle(color = colors.inkSoft, fontSize = 13.sp),
+                modifier = Modifier
+                    .background(colors.card.copy(alpha = 0.78f), RoundedCornerShape(14.dp))
+                    .padding(horizontal = 14.dp, vertical = 10.dp),
             )
         }
     }
+}
+
+/** Sol's dock: five cells in line with the home columns; apps can be dragged in and out. */
+@Composable
+private fun SolDock(
+    vm: LauncherViewModel,
+    colors: NumioColors,
+    cells: List<AppEntry?>,
+    placement: Placement,
+    modifier: Modifier = Modifier,
+) {
+    CellRow(vm, colors, cells, Slot.DOCK, 0, placement, modifier)
 }
 
 /** A dark pill, the one strong contrast on the light screen. */

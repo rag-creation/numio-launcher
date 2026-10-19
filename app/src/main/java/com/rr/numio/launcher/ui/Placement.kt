@@ -4,7 +4,6 @@ import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
@@ -12,93 +11,105 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
-import androidx.compose.ui.input.pointer.changedToUp
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.changedToUp
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.zIndex
+import com.rr.numio.launcher.data.Slot
 
 /**
- * Drag-to-rearrange for one row set (Sol's home rows, or the dock).
- * Tiles report where they sit; while one is dragged, the nearest slot is the drop target.
+ * Drag-and-drop over Sol's home cells and dock cells (filled or empty).
+ * Every cell reports where it sits; while an app is dragged, the cell nearest the finger is
+ * the drop target, unless the finger is far from every cell (then nothing moves).
  */
-class Reorder(private val onMove: (from: Int, to: Int) -> Unit) {
-    /** Where each slot sits on screen, by index. Plain map: it's only read during a drag. */
-    val slots = HashMap<Int, Rect>()
+class Placement(private val onDrop: (from: Slot, to: Slot) -> Unit) {
+    /** Where each cell sits on screen. Plain map: only read during a drag. */
+    val slots = HashMap<Slot, Rect>()
 
-    var dragging by mutableIntStateOf(-1)
+    var dragging by mutableStateOf<Slot?>(null)
         private set
     var offset by mutableStateOf(Offset.Zero)
         private set
-    var target by mutableIntStateOf(-1)
+    var target by mutableStateOf<Slot?>(null)
         private set
 
-    fun start(index: Int) {
-        dragging = index
+    fun start(slot: Slot) {
+        dragging = slot
         offset = Offset.Zero
-        target = index
+        target = slot
     }
 
     /** [total] is how far the finger has moved since the hold, in screen pixels. */
     fun drag(total: Offset) {
-        if (dragging < 0) return
+        val from = dragging ?: return
         offset = total
-        val centre = (slots[dragging] ?: return).center + offset
-        target = slots.minByOrNull { (it.value.center - centre).getDistance() }?.key ?: dragging
+        val home = slots[from] ?: return
+        val finger = home.center + total
+        val nearest = slots.minByOrNull { (it.value.center - finger).getDistance() } ?: return
+        val reach = maxOf(nearest.value.width, nearest.value.height) * 1.2f
+        target = if ((nearest.value.center - finger).getDistance() <= reach) nearest.key else from
     }
 
     /** Held but not moved: put it back without changing anything. */
     fun cancel() {
-        dragging = -1
+        dragging = null
         offset = Offset.Zero
-        target = -1
+        target = null
     }
 
     fun end() {
-        if (dragging >= 0 && target >= 0 && target != dragging) onMove(dragging, target)
-        dragging = -1
-        offset = Offset.Zero
-        target = -1
+        val from = dragging
+        val to = target
+        cancel()
+        if (from != null && to != null && to != from) onDrop(from, to)
     }
+
+    /** This cell is where the dragged app would land. */
+    fun isTarget(slot: Slot) = dragging != null && dragging != slot && target == slot
 }
 
 @Composable
-fun rememberReorder(onMove: (from: Int, to: Int) -> Unit): Reorder {
-    val latest by rememberUpdatedState(onMove)
-    return remember { Reorder { a, b -> latest(a, b) } }
+fun rememberPlacement(onDrop: (from: Slot, to: Slot) -> Unit): Placement {
+    val latest by rememberUpdatedState(onDrop)
+    return remember { Placement { a, b -> latest(a, b) } }
 }
 
+/** An empty cell: nothing to drag, but apps can be dropped on it. */
+fun Modifier.dropCell(placement: Placement, slot: Slot): Modifier =
+    onGloballyPositioned { placement.slots[slot] = it.boundsInWindow() }
+
 /**
- * Everything a rearrangeable tile needs, in one place (used by the home rows and dock, and
- * by the unit test): reports where the slot sits, handles tap / hold / drag, and lifts the
- * icon while it's held. The gesture sits before the lift, so it measures real finger travel.
+ * A cell with an app (used by the home cells, the dock and the unit test): reports where the
+ * cell sits, handles tap / hold / drag, and lifts the icon while it's held. The gesture sits
+ * before the lift, so it measures real finger travel.
  *
  * Hold lifts the icon at once. Moving drags it; letting go without moving calls [onMenu].
  * The menu only opens after the finger is up, so no popup appears in the middle of a drag.
  */
-fun Modifier.reorderSlot(
-    reorder: Reorder,
-    index: Int,
+fun Modifier.appCell(
+    placement: Placement,
+    slot: Slot,
     key: Any,
     onTap: () -> Unit,
     onHoldStart: () -> Unit,
     onMenu: () -> Unit,
 ): Modifier = this
-    .onGloballyPositioned { if (reorder.dragging != index) reorder.slots[index] = it.boundsInWindow() }
+    .onGloballyPositioned { if (placement.dragging != slot) placement.slots[slot] = it.boundsInWindow() }
     .tapHoldDrag(
-        key = key to index,
+        key = key to slot,
         onTap = onTap,
-        onHoldStart = { reorder.start(index); onHoldStart() },
-        onHoldRelease = { reorder.cancel(); onMenu() },
-        onDrag = reorder::drag,
-        onDragEnd = reorder::end,
+        onHoldStart = { placement.start(slot); onHoldStart() },
+        onHoldRelease = { placement.cancel(); onMenu() },
+        onDrag = placement::drag,
+        onDragEnd = placement::end,
     )
-    .zIndex(if (reorder.dragging == index) 1f else 0f)
+    .zIndex(if (placement.dragging == slot) 1f else 0f)
     .graphicsLayer {
-        if (reorder.dragging == index) {
-            translationX = reorder.offset.x
-            translationY = reorder.offset.y
+        if (placement.dragging == slot) {
+            translationX = placement.offset.x
+            translationY = placement.offset.y
             scaleX = 1.12f
             scaleY = 1.12f
         }

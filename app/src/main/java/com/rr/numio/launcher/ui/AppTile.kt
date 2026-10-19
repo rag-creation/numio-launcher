@@ -29,9 +29,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect as ComposeRect
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.boundsInWindow
-import androidx.compose.ui.zIndex
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -49,6 +49,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.rr.numio.launcher.LauncherViewModel
 import com.rr.numio.launcher.data.AppEntry
+import com.rr.numio.launcher.data.Slot
 import com.rr.numio.launcher.icons.ThemedIcons
 import com.rr.numio.launcher.sketch.SketchIcons
 
@@ -83,9 +84,9 @@ fun AppTile(
     highlighted: Boolean = false,
     /** Small grey line under the name: the maker for same-name apps, or the profile. */
     subtitle: String? = null,
-    /** Set for icons that can be rearranged (Sol's home rows and dock): hold and move to drag. */
-    reorder: Reorder? = null,
-    index: Int = -1,
+    /** Set for icons in Sol's home or dock cells: hold and move to drag them to another cell. */
+    placement: Placement? = null,
+    slot: Slot? = null,
 ) {
     val view = LocalView.current
     val haptics = LocalHapticFeedback.current
@@ -104,11 +105,11 @@ fun AppTile(
     val description = listOfNotNull(entry.label, subtitle, entry.profileLabel?.let { "$it profile" })
         .distinct().joinToString(", ")
 
-    val isTarget = reorder != null && reorder.dragging >= 0 && reorder.target == index && reorder.dragging != index
+    val isTarget = placement != null && slot != null && placement.isTarget(slot)
 
     // Plain tiles (Shelf, Ink) keep the tested click handling; home rows and dock get
     // tap / hold / drag on a box that stays put while the icon is lifted.
-    val outer = if (reorder == null) {
+    val outer = if (placement == null || slot == null) {
         modifier
     } else {
         modifier
@@ -117,14 +118,14 @@ fun AppTile(
                 onClick(label = "Open") { open(); true }
                 onLongClick(label = "App options") { menu = true; true }
             }
-            .reorderSlot(
-                reorder, index, entry.key,
+            .appCell(
+                placement, slot, entry.key,
                 onTap = open,
                 onHoldStart = { haptics.performHapticFeedback(HapticFeedbackType.LongPress) },
                 onMenu = { menu = true },
             )
     }
-    val plainClick = if (reorder == null) {
+    val plainClick = if (placement == null) {
         Modifier
             .semantics { contentDescription = description }
             .combinedClickable(
@@ -144,12 +145,16 @@ fun AppTile(
                 .then(plainClick)
                 .padding(vertical = 6.dp),
         ) {
+            // The drop-target ring is drawn just outside the icon, so nothing shifts while dragging
             val ring = when {
-                !(highlighted || isTarget) -> Modifier
+                isTarget -> Modifier.drawBehind {
+                    drawCircle(colors.gold, radius = size.minDimension / 2 + 4.dp.toPx(), style = Stroke(2.dp.toPx()))
+                }
+                !highlighted -> Modifier
                 colors.sketch -> Modifier.sketchBorder(colors.gold, iconSize, seed = 5, width = 2.dp)
                 else -> Modifier.border(2.dp, colors.gold, CircleShape)
             }
-            Box(ring.padding(if (highlighted || isTarget) 3.dp else 0.dp)) {
+            Box(ring.padding(if (highlighted) 3.dp else 0.dp)) {
                 AppIcon(
                     entry, iconSize,
                     Modifier.onGloballyPositioned { bounds = it.boundsInWindow() },

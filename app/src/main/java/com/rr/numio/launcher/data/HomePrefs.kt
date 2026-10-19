@@ -31,22 +31,30 @@ class HomePrefs(context: Context) {
 
     private val store = context.applicationContext.homeStore
 
-    /** Dock app keys in order. null = never set, so the default dock gets picked. */
-    val dock: Flow<List<String>?> = store.data.map { p ->
-        p[DOCK]?.split('\n')?.filter { it.isNotEmpty() }
+    /** Dock cells (null = empty cell). null overall = never set, so the default dock gets picked. */
+    val dock: Flow<List<String?>?> = store.data.map { p ->
+        p[DOCK]?.split('\n')?.map { it.ifEmpty { null } }
     }
 
     val background: Flow<Background> = store.data.map { p ->
         if (p[BACKGROUND] == "wallpaper") Background.Wallpaper else Background.Paper
     }
 
-    /** Apps placed on Sol's home rows, in order (up to [HOME_MAX]). */
-    val homeApps: Flow<List<String>> = store.data.map { p ->
-        p[HOME_APPS]?.split('\n')?.filter { it.isNotEmpty() }.orEmpty()
+    /** Sol's home cells, row by row ([HOME_MAX] of them; null = empty cell). */
+    val homeApps: Flow<List<String?>> = store.data.map { p ->
+        p[HOME_APPS]?.split('\n')?.map { it.ifEmpty { null } }.orEmpty()
     }
 
-    suspend fun setHomeApps(keys: List<String>) {
-        store.edit { it[HOME_APPS] = keys.joinToString("\n") }
+    suspend fun setHomeApps(cells: List<String?>) {
+        store.edit { it[HOME_APPS] = cells.joinToString("\n") { k -> k.orEmpty() } }
+    }
+
+    /** Home and dock in one save, so a move between them is never half done. */
+    suspend fun setCells(home: List<String?>, dock: List<String?>) {
+        store.edit {
+            it[HOME_APPS] = home.joinToString("\n") { k -> k.orEmpty() }
+            it[DOCK] = dock.joinToString("\n") { k -> k.orEmpty() }
+        }
     }
 
     val theme: Flow<HomeTheme> = store.data.map { p ->
@@ -80,8 +88,8 @@ class HomePrefs(context: Context) {
         store.edit { it[SHOW_CALENDAR] = on }
     }
 
-    suspend fun setDock(keys: List<String>) {
-        store.edit { it[DOCK] = keys.joinToString("\n") }
+    suspend fun setDock(cells: List<String?>) {
+        store.edit { it[DOCK] = cells.joinToString("\n") { k -> k.orEmpty() } }
     }
 
     suspend fun setBackground(bg: Background) {

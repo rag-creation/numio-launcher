@@ -11,6 +11,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.rr.numio.launcher.data.Slot
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Rule
@@ -19,88 +20,102 @@ import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
 
 /**
- * Real touch input against the same reorderSlot() the home rows and dock use:
- * three 80dp slots in a row, like icons.
+ * Real touch input against the same appCell() / dropCell() the home and dock use:
+ * two app cells and one empty cell in a row, 80dp each.
  */
 @RunWith(AndroidJUnit4::class)
 @Config(sdk = [35])
-class ReorderGestureTest {
+class PlacementGestureTest {
 
     @get:Rule
     val rule = createComposeRule()
 
-    private var moved: Pair<Int, Int>? = null
+    private var dropped: Pair<Slot, Slot>? = null
     private var tapped = -1
     private var menu = -1
 
+    private fun home(i: Int) = Slot(Slot.HOME, i)
+
     private fun setUp() {
         rule.setContent {
-            val reorder = rememberReorder { from, to -> moved = from to to }
+            val placement = rememberPlacement { from, to -> dropped = from to to }
             Row {
-                repeat(3) { i ->
+                repeat(2) { i ->
                     Box(
                         Modifier
                             .size(80.dp)
-                            .reorderSlot(
-                                reorder, i, "app$i",
+                            .appCell(
+                                placement, home(i), "app$i",
                                 onTap = { tapped = i },
                                 onHoldStart = {},
                                 onMenu = { menu = i },
                             )
-                            .testTag("slot$i")
+                            .testTag("app$i")
                     )
                 }
+                Box(Modifier.size(80.dp).dropCell(placement, home(2)).testTag("empty2"))
             }
         }
     }
 
     @Test
-    fun holdAndDragToTheThirdSlot_movesIt() {
+    fun dragIntoTheEmptyCell_dropsThere() {
         setUp()
-        rule.onNodeWithTag("slot0").performTouchInput {
+        rule.onNodeWithTag("app0").performTouchInput {
             down(center)
             advanceEventTime(viewConfiguration.longPressTimeoutMillis + 200)
-            // move in small steps, like a finger, two slots to the right
             repeat(10) { moveBy(Offset(width * 0.2f, 0f)) }
             up()
         }
         rule.runOnIdle {
-            assertEquals(0 to 2, moved)
+            assertEquals(home(0) to home(2), dropped)
             assertEquals(-1, menu)
             assertEquals(-1, tapped)
         }
     }
 
     @Test
-    fun holdAndDragBackwards_movesIt() {
+    fun dragOntoTheOtherApp_dropsThere() {
         setUp()
-        rule.onNodeWithTag("slot2").performTouchInput {
+        rule.onNodeWithTag("app1").performTouchInput {
             down(center)
             advanceEventTime(viewConfiguration.longPressTimeoutMillis + 200)
             repeat(10) { moveBy(Offset(-width * 0.1f, 0f)) }
             up()
         }
-        rule.runOnIdle { assertEquals(2 to 1, moved) }
+        rule.runOnIdle { assertEquals(home(1) to home(0), dropped) }
+    }
+
+    @Test
+    fun dragFarFromEveryCell_changesNothing() {
+        setUp()
+        rule.onNodeWithTag("app0").performTouchInput {
+            down(center)
+            advanceEventTime(viewConfiguration.longPressTimeoutMillis + 200)
+            repeat(10) { moveBy(Offset(0f, height * 0.5f)) }
+            up()
+        }
+        rule.runOnIdle { assertNull(dropped) }
     }
 
     @Test
     fun holdAndReleaseWithoutMoving_opensTheMenuOnly() {
         setUp()
-        rule.onNodeWithTag("slot1").performTouchInput {
+        rule.onNodeWithTag("app1").performTouchInput {
             down(center)
             advanceEventTime(viewConfiguration.longPressTimeoutMillis + 200)
             up()
         }
         rule.runOnIdle {
             assertEquals(1, menu)
-            assertNull(moved)
+            assertNull(dropped)
         }
     }
 
     @Test
     fun quickTap_opensTheApp() {
         setUp()
-        rule.onNodeWithTag("slot1").performTouchInput {
+        rule.onNodeWithTag("app1").performTouchInput {
             down(center)
             advanceEventTime(50)
             up()
@@ -108,7 +123,7 @@ class ReorderGestureTest {
         rule.runOnIdle {
             assertEquals(1, tapped)
             assertEquals(-1, menu)
-            assertNull(moved)
+            assertNull(dropped)
         }
     }
 }
