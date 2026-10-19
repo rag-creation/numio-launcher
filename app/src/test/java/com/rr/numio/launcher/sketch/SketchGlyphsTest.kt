@@ -20,7 +20,7 @@ class SketchGlyphsTest {
 
     @Test fun everyPrototypeAppHasASymbol() {
         assertEquals(SketchKind.entries.toSet(), SketchGlyphs.all.keys)
-        for ((k, layers) in SketchGlyphs.all) assertTrue("$k has no pen line", layers.any { it is Layer.Ink })
+        for ((k, layers) in SketchGlyphs.all) assertTrue("$k has no pen line", layers.any { it is Layer.Ink || it is Layer.Thin })
     }
 
     @Test fun pathsUseOnlyMoveLineCurveClose() {

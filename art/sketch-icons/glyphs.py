@@ -296,6 +296,35 @@ GLYPHS["agenda"] = [
     ("hatch", hatch(55, 73)),
 ]
 
+# ── Assistant (Ink Orbit): an original Numio mark for AI assistant apps ────────
+# A small gold four-point spark inside two tilted ink orbits, each lifted once.
+# Picked by hand only; it is not any AI company's logo.
+
+def spark(cx, cy, r, pinch=0.26):
+    """A four-point spark: pinched curves between four tips (not a many-rayed asterisk)."""
+    p = r * pinch
+    t, rt, b, l = (cx, cy - r), (cx + r, cy), (cx, cy + r), (cx - r, cy)
+    return (f"M{f(t[0])},{f(t[1])} C{f(cx+p)},{f(cy-p)} {f(cx+p)},{f(cy-p)} {f(rt[0])},{f(rt[1])} "
+            f"C{f(cx+p)},{f(cy+p)} {f(cx+p)},{f(cy+p)} {f(b[0])},{f(b[1])} "
+            f"C{f(cx-p)},{f(cy+p)} {f(cx-p)},{f(cy+p)} {f(l[0])},{f(l[1])} "
+            f"C{f(cx-p)},{f(cy-p)} {f(cx-p)},{f(cy-p)} {f(t[0])},{f(t[1])} Z")
+
+def orbit(cx, cy, rx, ry, tilt, start, sweep, n=60):
+    """An open, tilted ellipse arc as a polyline: one imperfect pen stroke of an orbit."""
+    a0, tr = math.radians(start), math.radians(tilt)
+    pts = []
+    for i in range(n + 1):
+        a = a0 + math.radians(sweep) * i / n
+        x, y = rx * math.cos(a), ry * math.sin(a)
+        pts.append((cx + x * math.cos(tr) - y * math.sin(tr), cy + x * math.sin(tr) + y * math.cos(tr)))
+    return f"M{f(pts[0][0])},{f(pts[0][1])} " + " ".join(f"L{f(x)},{f(y)}" for x, y in pts[1:])
+
+GLYPHS["assistant"] = [
+    ("thin", "INK", orbit(50, 50, 27, 9.5, -22, 215, 325)),
+    ("thin", "INK", orbit(50, 50, 27, 9.5, 22, 35, 325)),
+    ("fill", "GOLD", spark(50, 50, 13)),
+]
+
 # ── one size for all: every drawing fits inside the same inner circle ─────────
 
 FIT_R = 28.0   # grid units from the centre; keeps clear paper between symbol and ring

@@ -49,6 +49,8 @@ enum class SketchKind(
     Maps("Maps", listOf("map"), listOf("maps")),
     Calculator("Calculator", listOf("calculator", "calc"), listOf("calculator")),
     Recorder("Recorder", listOf("recorder", "recording"), listOf("voice recorder", "recorder", "sound recorder")),
+    /** Ink Orbit: Numio's own mark for AI assistant apps. Picked by hand only. */
+    Assistant("Assistant", emptyList(), main = false),
 }
 
 /** Colours a glyph may use. Charcoal ink, warm cream and a little gold, nothing else. */
