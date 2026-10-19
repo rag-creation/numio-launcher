@@ -96,6 +96,9 @@ jobs:
           for id in $(gh api repos/$GITHUB_REPOSITORY/releases --jq '.[] | select(.draft and .name == "Test build") | .id'); do
             gh api -X DELETE repos/$GITHUB_REPOSITORY/releases/$id
           done
-          gh release create "test-${GITHUB_SHA::7}" "$APK_NAME" --draft \
+          # preview sheets drawn by the tests (if any), next to the APK
+          files="$APK_NAME"
+          for f in app/build/sketch-preview/*.png; do [ -f "$f" ] && files="$files $f"; done
+          gh release create "test-${GITHUB_SHA::7}" $files --draft \
             --target "$GITHUB_SHA" --title "Test build" \
-            --notes "Latest build from main (${GITHUB_SHA::7}). For testing only. Installs as Launcher Test, next to the real app."
+            --notes "Test build from the ${GITHUB_REF_NAME} branch (${GITHUB_SHA::7}). For testing only. Installs as Launcher Test, next to the real app."

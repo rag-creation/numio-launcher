@@ -20,7 +20,8 @@ import kotlinx.coroutines.withContext
 /**
  * Every app icon, drawn in the Sketch style: a cream paper disc with a wobbly ink ring.
  *
- *  1. Hand-drawn icons (RR's own drawings) — coming next; none bundled yet.
+ *  1. Numio Sketch symbols (see [SketchGlyphs]) for the phone's own Phone, Messages,
+ *     Camera, Settings, Calendar, Browser, Contacts and Clock apps, found by [SketchRoles].
  *  2. The app's monochrome icon layer (Android 13+), inked onto the disc —
  *     unless that layer is one solid blob (e.g. a filled circle), which would
  *     ink the whole disc black.
@@ -51,14 +52,29 @@ object SketchIcons {
 
     /** After an app update or removal, so its icon is drawn again. */
     fun evictPackage(packageName: String) {
+        SketchRoles.reset()
         val prefix = "$packageName/"
         cache.snapshot().keys.filter { it.startsWith(prefix) }.forEach { cache.remove(it) }
     }
 
     private fun render(context: Context, entry: AppEntry, px: Int): Bitmap {
         val bmp = Bitmap.createBitmap(px, px, Bitmap.Config.ARGB_8888)
-        val c = Canvas(bmp)
-        val seed = entry.key.hashCode()
+        val kind = SketchRoles.kindFor(entry.packageName, entry.label, SketchRoles.roles(context))
+        paint(context, Canvas(bmp), px, entry.key.hashCode(), entry.label, kind, entry.isMainUser) {
+            MonoLayer.of(entry)
+        }
+        return bmp
+    }
+
+    /**
+     * One icon, [px] square, onto [c]: paper disc, then the [kind]'s sketch symbol, else the
+     * app's monochrome layer from [mono], else its first letter; then the ink ring and, for
+     * other profiles, the gold badge. Also used to draw the preview sheets.
+     */
+    fun paint(
+        context: Context, c: Canvas, px: Int, seed: Int, label: String,
+        kind: SketchKind?, isMainUser: Boolean, mono: () -> Drawable?,
+    ) {
         val cx = px / 2f
         val r = px * 0.44f
         val stroke = (px * 0.035f).coerceAtLeast(1.5f)
@@ -67,16 +83,21 @@ object SketchIcons {
         val disc = SketchInk.wobblyCircle(cx, cx, r, stroke * 0.5f, seed)
         c.drawPath(disc, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = PAPER })
 
-        // The mark inside
-        val mono = MonoLayer.of(entry)?.let { MonoLayer.inked(it, px, cx, r, INK) }
-        if (mono != null) {
+        // The mark inside: a Numio Sketch symbol, else the app's own monochrome mark, else a letter
+        val inked = if (kind == null) mono()?.let { MonoLayer.inked(it, px, cx, r, INK) } else null
+        if (kind != null) {
             c.save()
             c.clipPath(disc)
-            c.drawBitmap(mono, 0f, 0f, null)
+            SketchPen.draw(c, kind, cx, cx, r)
             c.restore()
-            mono.recycle()
+        } else if (inked != null) {
+            c.save()
+            c.clipPath(disc)
+            c.drawBitmap(inked, 0f, 0f, null)
+            c.restore()
+            inked.recycle()
         } else {
-            drawLetter(context, c, entry.label, cx, r)
+            drawLetter(context, c, label, cx, r)
         }
 
         // Ink ring: one firm line and a lighter second pass
@@ -90,7 +111,7 @@ object SketchIcons {
         c.drawPath(SketchInk.wobblyCircle(cx, cx, r - stroke * 0.6f, stroke * 0.7f, seed * 31 + 7), ink)
 
         // Second-profile apps: a gold badge with an ink ring, bottom right
-        if (!entry.isMainUser) {
+        if (!isMainUser) {
             val bx = cx + r * 0.70f
             val by = cx + r * 0.70f
             val br = r * 0.27f
@@ -99,7 +120,6 @@ object SketchIcons {
                 color = INK; style = Paint.Style.STROKE; strokeWidth = stroke * 0.8f
             })
         }
-        return bmp
     }
 
 
