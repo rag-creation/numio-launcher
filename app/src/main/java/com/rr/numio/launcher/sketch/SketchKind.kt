@@ -3,6 +3,8 @@ package com.rr.numio.launcher.sketch
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ApplicationInfo
+import android.content.pm.LauncherApps
+import android.os.Process
 import android.content.pm.PackageManager
 import android.provider.Telephony
 import android.telecom.TelecomManager
@@ -101,21 +103,46 @@ object SketchRoles {
     data class Handler(val packageName: String, val preinstalled: Boolean)
 
     /**
-     * The apps that get a job's symbol: your chosen default, else the preinstalled ones,
-     * else the only one there is. "android" (the app chooser) is never a choice.
+     * The apps that get a job's symbol. Only apps you can see in the app list count
+     * ([shown]: package to its name there), so a hidden or half-removed app never takes
+     * the symbol from the one you use. In order:
+     *  1. your chosen default;
+     *  2. else, of the apps that do the job, the single one whose name says what it is
+     *     (Fossify Contacts is "Contacts"; a messenger that can also add contacts isn't);
+     *  3. else the preinstalled ones;
+     *  4. else the only app that does the job.
+     * "android" (the app chooser) is never a choice.
      */
-    fun choose(defaults: List<String?>, handlers: List<Handler>): Set<String> {
-        val chosen = defaults.filterNotNull().filter { it.isNotEmpty() && it != "android" }.toSet()
+    fun choose(
+        kind: SketchKind,
+        defaults: List<String?>,
+        handlers: List<Handler>,
+        shown: Map<String, String>?,
+    ): Set<String> {
+        fun visible(p: String) = p != "android" && p.isNotEmpty() && (shown == null || p in shown)
+        val chosen = defaults.filterNotNull().filter(::visible).toSet()
         if (chosen.isNotEmpty()) return chosen
-        val real = handlers.filter { it.packageName != "android" }
+        val real = handlers.filter { visible(it.packageName) }
+        val all = real.map { it.packageName }.toSet()
+        val named = all.filter { p -> shown?.get(p)?.lowercase()?.let { n -> kind.words.any { it in n } } == true }
+        if (named.size == 1) return named.toSet()
         val preinstalled = real.filter { it.preinstalled }.map { it.packageName }.toSet()
         if (preinstalled.isNotEmpty()) return preinstalled
-        val all = real.map { it.packageName }.toSet()
         return if (all.size == 1) all else emptySet()
+    }
+
+    /** Packages with an icon in the app list (this profile), with their names. Null if unknown. */
+    private fun shownApps(context: Context): Map<String, String>? = try {
+        context.getSystemService(LauncherApps::class.java)
+            ?.getActivityList(null, Process.myUserHandle())
+            ?.associate { it.applicationInfo.packageName to it.label.toString() }
+    } catch (e: Exception) {
+        null
     }
 
     fun detect(context: Context): Map<SketchKind, Set<String>> {
         val pm = context.packageManager
+        val shown = shownApps(context)
         fun safe(block: () -> String?): String? = try { block() } catch (e: Exception) { null }
         return intents().mapValues { (kind, list) ->
             val defaults = list.map { intent ->
@@ -135,7 +162,7 @@ object SketchRoles {
                     emptyList()
                 }
             }
-            choose(defaults, handlers)
+            choose(kind, defaults, handlers, shown)
         }
     }
 

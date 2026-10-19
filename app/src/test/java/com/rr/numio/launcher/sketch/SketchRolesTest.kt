@@ -50,26 +50,26 @@ class SketchRolesTest {
         // Fossify Phone set as the dialer: it wins over the preinstalled one
         assertEquals(
             setOf("org.fossify.phone"),
-            SketchRoles.choose(listOf("org.fossify.phone"), listOf(h("org.fossify.phone", false), h("com.samsung.android.dialer", true))),
+            SketchRoles.choose(SketchKind.Phone, listOf("org.fossify.phone"), listOf(h("org.fossify.phone", false), h("com.samsung.android.dialer", true)), null),
         )
         // Fennec as the default browser
-        assertEquals(setOf("org.mozilla.fennec_fdroid"), SketchRoles.choose(listOf("org.mozilla.fennec_fdroid", null), emptyList()))
+        assertEquals(setOf("org.mozilla.fennec_fdroid"), SketchRoles.choose(SketchKind.Browser, listOf("org.mozilla.fennec_fdroid", null), emptyList(), null))
     }
 
     @Test fun withoutADefaultThePreinstalledAppsCount() {
         assertEquals(
             setOf("com.sec.android.app.camera"),
-            SketchRoles.choose(listOf("android"), listOf(h("com.sec.android.app.camera", true), h("net.sourceforge.opencamera", false))),
+            SketchRoles.choose(SketchKind.Camera, listOf("android"), listOf(h("com.sec.android.app.camera", true), h("net.sourceforge.opencamera", false)), null),
         )
     }
 
     @Test fun withNeitherOnlyASingleAppCounts() {
         // one calendar app installed: it gets the symbol
-        assertEquals(setOf("org.fossify.calendar"), SketchRoles.choose(listOf(null), listOf(h("org.fossify.calendar", false))))
+        assertEquals(setOf("org.fossify.calendar"), SketchRoles.choose(SketchKind.Calendar, listOf(null), listOf(h("org.fossify.calendar", false)), null))
         // three calendars and no default: none is singled out, each keeps its own look
         assertEquals(
             emptySet<String>(),
-            SketchRoles.choose(listOf("android"), listOf(h("org.fossify.calendar", false), h("com.goodwy.calendar", false), h("com.rr.numio.calendar", false))),
+            SketchRoles.choose(SketchKind.Calendar, listOf("android"), listOf(h("org.fossify.calendar", false), h("com.goodwy.calendar", false), h("com.rr.numio.calendar", false)), mapOf("org.fossify.calendar" to "Calendar", "com.goodwy.calendar" to "Calendar", "com.rr.numio.calendar" to "Calendar")),
         )
     }
 
@@ -78,8 +78,41 @@ class SketchRolesTest {
         val contacts = SketchRoles.intents()[SketchKind.Contacts].orEmpty()
         assertTrue(contacts.any { it.action == android.content.Intent.ACTION_INSERT && it.type == "vnd.android.cursor.dir/contact" })
         // the only app that creates contacts gets the person symbol
-        assertEquals(setOf("org.fossify.contacts"), SketchRoles.choose(listOf(null, "org.fossify.contacts"), listOf(h("org.fossify.contacts", false))))
+        assertEquals(setOf("org.fossify.contacts"), SketchRoles.choose(SketchKind.Contacts, listOf(null, "org.fossify.contacts"), listOf(h("org.fossify.contacts", false)), null))
         assertEquals(SketchKind.Contacts, SketchRoles.kindFor("org.fossify.contacts", "Contacts", mapOf(SketchKind.Contacts to setOf("org.fossify.contacts"))))
+    }
+
+    @Test fun hiddenAppsNeverTakeTheSymbolFromTheOneYouUse() {
+        // Samsung Contacts still installed but hidden from the app list; Fossify Contacts shown
+        val shown = mapOf("org.fossify.contacts" to "Contacts", "im.molly.app" to "Molly")
+        assertEquals(
+            setOf("org.fossify.contacts"),
+            SketchRoles.choose(
+                SketchKind.Contacts,
+                listOf("com.samsung.android.app.contacts", "android"),
+                listOf(h("com.samsung.android.app.contacts", true), h("org.fossify.contacts", false)),
+                shown,
+            ),
+        )
+    }
+
+    @Test fun ofSeveralInstalledAppsTheOneNamedForTheJobWins() {
+        // a messenger that can also "add a contact" doesn't take the person symbol
+        val shown = mapOf("org.fossify.contacts" to "Contacts", "im.molly.app" to "Molly")
+        assertEquals(
+            setOf("org.fossify.contacts"),
+            SketchRoles.choose(SketchKind.Contacts, listOf("android"), listOf(h("org.fossify.contacts", false), h("im.molly.app", false)), shown),
+        )
+    }
+
+    @Test fun aVisibleBuiltInAppThatCanAlsoAddContactsDoesntWin() {
+        val shown = mapOf("org.fossify.contacts" to "Contacts", "com.samsung.android.dialer" to "Phone")
+        assertEquals(
+            setOf("org.fossify.contacts"),
+            SketchRoles.choose(SketchKind.Contacts, listOf("android"), listOf(h("com.samsung.android.dialer", true), h("org.fossify.contacts", false)), shown),
+        )
+        // a lone calendar app that isn't named "Calendar" (Etar) still gets it
+        assertEquals(setOf("ws.xsoh.etar"), SketchRoles.choose(SketchKind.Calendar, listOf(null), listOf(h("ws.xsoh.etar", false)), mapOf("ws.xsoh.etar" to "Etar")))
     }
 
     @Test fun everyJobHasAWayToBeFound() {
