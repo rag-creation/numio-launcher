@@ -86,10 +86,13 @@ class SketchTreatmentTest {
         val extracted = inked(draw(mono = false, derived = flatMark()))
         val own = inked(draw(mono = true, derived = flatMark()))
         // something readable is always drawn
-        assertTrue(letter.count { it } > 200)
+        val lc = letter.count { it }
+        assertTrue("letter fallback drew $lc dark pixels", lc > 200)
         // an extracted shape replaces the letter, and the app's own layer comes before it
-        assertTrue(letter.indices.count { letter[it] != extracted[it] } > 100)
-        assertTrue(own.indices.count { own[it] != extracted[it] } > 100)
+        val d1 = letter.indices.count { letter[it] != extracted[it] }
+        assertTrue("extracted shape didn't replace the letter ($d1 px differ)", d1 > 100)
+        val d2 = own.indices.count { own[it] != extracted[it] }
+        assertTrue("own layer didn't come before the extracted shape ($d2 px differ, own has ${own.count { it }})", d2 > 100)
     }
 
     @Test fun cacheKeysFollowTheChoiceAndThePackage() {
