@@ -65,7 +65,9 @@ class PortalRulesTest {
         assertTrue(PortalRules.lowContrast(PortalColor.Olive, PortalStyle.Extruded))
         assertTrue(PortalRules.lowContrast(PortalColor.Cream, PortalStyle.FloatingCeramic))
         assertTrue(PortalRules.lowContrast(PortalColor.Cream, PortalStyle.Glass))
-        for (st in PortalStyle.entries) assertFalse(PortalRules.lowContrast(PortalColor.Gold, st))
+        for (st in PortalStyle.entries - PortalStyle.Mustard) assertFalse(PortalRules.lowContrast(PortalColor.Gold, st))
+        assertTrue(PortalRules.lowContrast(PortalColor.Gold, PortalStyle.Mustard))
+        assertFalse(PortalRules.lowContrast(PortalColor.Charcoal, PortalStyle.Mustard))
         assertFalse(PortalRules.lowContrast(PortalColor.Charcoal, PortalStyle.SageCeramic))
     }
 
@@ -96,5 +98,16 @@ class PortalRulesTest {
     @Test fun toggle() {
         assertEquals(listOf("a", "b"), PortalRules.toggle(listOf("a"), "b"))
         assertEquals(listOf("a"), PortalRules.toggle(listOf("a", "b"), "b"))
+    }
+
+    @Test fun mustardDiscSwitchesAGoldMarkToCharcoalOnly() {
+        val base = PortalSettings(action = PortalAction.Selected, apps = listOf("a/.A#0"))
+        assertEquals(base.copy(style = PortalStyle.Mustard, color = PortalColor.Charcoal), PortalRules.withStyle(base.copy(color = PortalColor.Gold), PortalStyle.Mustard))
+        assertEquals(PortalColor.Charcoal, PortalRules.withStyle(base.copy(color = PortalColor.Auto), PortalStyle.Mustard).color)
+        assertEquals(PortalColor.Cream, PortalRules.withStyle(base.copy(color = PortalColor.Cream), PortalStyle.Mustard).color)
+        // other styles never touch the colour
+        for (st in PortalStyle.entries - PortalStyle.Mustard) {
+            assertEquals(base.copy(style = st), PortalRules.withStyle(base, st))
+        }
     }
 }

@@ -48,24 +48,44 @@ import kotlin.math.sin
 
 private val Shadow = Color(0xFF472E14)
 
-/** The official mark, raised slightly off the button: a soft shadow below, a lit edge above. */
+/** A darker shade of [c] for the mark's sides. */
+private fun side(c: Color) = Color(c.red * 0.55f, c.green * 0.55f, c.blue * 0.5f, 1f)
+
+/**
+ * The official mark standing up off the button like a thick cut-out: a soft shadow cast
+ * down-right, a darker side under it for thickness, a lit upper edge, then the mark itself
+ * (the official amber N or the chosen colour) with its white dot. Shapes are never altered,
+ * only stacked.
+ */
 @Composable
 fun EmbossedMark(tint: Long?, size: Dp, modifier: Modifier = Modifier) {
     val n = painterResource(R.drawable.numio_mark_n)
     val dot = painterResource(R.drawable.numio_mark_dot)
     val whole = painterResource(R.drawable.numio_mark)
+    val face = Color(tint ?: 0xFFFFC21A)
+    val depth = (size.value / 16f).coerceIn(1.5f, 3.5f)
     Box(modifier.size(size)) {
-        // shadow under the raised mark
+        // cast shadow
         Image(
             whole, null,
-            colorFilter = ColorFilter.tint(Shadow.copy(alpha = 0.45f)),
-            modifier = Modifier.fillMaxSize().offset(0.5.dp, 1.3.dp).blur(1.2.dp, BlurredEdgeTreatment.Unbounded),
+            colorFilter = ColorFilter.tint(Shadow.copy(alpha = 0.55f)),
+            modifier = Modifier.fillMaxSize().offset((depth * 0.7f).dp, (depth * 1.6f).dp).blur((depth * 0.9f).dp, BlurredEdgeTreatment.Unbounded),
         )
+        // thickness: the side, stacked a few steps down
+        val steps = 4
+        for (i in steps downTo 1) {
+            val d = depth * i / steps
+            Image(
+                whole, null,
+                colorFilter = ColorFilter.tint(side(face)),
+                modifier = Modifier.fillMaxSize().offset((d * 0.35f).dp, d.dp),
+            )
+        }
         // light catching the upper edges
         Image(
             whole, null,
-            colorFilter = ColorFilter.tint(Color.White.copy(alpha = 0.55f)),
-            modifier = Modifier.fillMaxSize().offset((-0.5).dp, (-0.6).dp),
+            colorFilter = ColorFilter.tint(Color.White.copy(alpha = 0.6f)),
+            modifier = Modifier.fillMaxSize().offset((-0.4).dp, (-0.6).dp),
         )
         // the mark: the official amber N (or the chosen colour) and its white dot
         Image(n, null, colorFilter = tint?.let { ColorFilter.tint(Color(it)) }, modifier = Modifier.fillMaxSize())
@@ -89,12 +109,13 @@ private fun DrawScope.ceramic(top: Color, mid: Color, edge: Color, r: Float, c: 
 }
 
 /**
- * The button for a style: [size] across, the mark about 58% of that.
- * Sage ceramic (default), a lighter floating ceramic, a 3D button with visible depth, or glass.
+ * The button for a style: [size] across, the mark about 70% of that.
+ * Sage ceramic (default), a lighter floating ceramic, a 3D button with visible depth, a mustard
+ * disc, or glass.
  */
 @Composable
 fun PortalVisual(style: PortalStyle, tint: Long?, modifier: Modifier = Modifier, size: Dp = 52.dp) {
-    val mark = size * 0.58f
+    val mark = size * 0.70f
     Box(modifier.size(size), contentAlignment = Alignment.Center) {
         when (style) {
             PortalStyle.SageCeramic -> Box(
@@ -128,6 +149,14 @@ fun PortalVisual(style: PortalStyle, tint: Long?, modifier: Modifier = Modifier,
                             r, Offset(center.x, center.y + depth / 2),
                         )
                         ceramic(Color(0xFFD2DCC6), Color(0xFFA3B092), Color(0xFF85937A), r, top)
+                    }
+            )
+            PortalStyle.Mustard -> Box(
+                Modifier
+                    .size(size)
+                    .shadow(10.dp, CircleShape, clip = false, ambientColor = Shadow, spotColor = Shadow)
+                    .drawBehind {
+                        ceramic(Color(0xFFE9C25A), Color(0xFFD6A93A), Color(0xFFB58A28), this.size.minDimension / 2, center)
                     }
             )
             PortalStyle.Glass -> Box(

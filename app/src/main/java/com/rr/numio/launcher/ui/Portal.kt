@@ -175,7 +175,7 @@ fun PortalSettingsContent(
                             contentDescription = "${st.label} button"
                             stateDescription = if (selected) "Selected" else "Not selected"
                         }
-                        .selectable(selected = selected, role = Role.RadioButton) { draft = draft.copy(style = st) }
+                        .selectable(selected = selected, role = Role.RadioButton) { draft = PortalRules.withStyle(draft, st) }
                         .padding(vertical = 8.dp),
                 ) {
                     PortalVisual(st, PortalRules.color(draft.color, theme), size = 40.dp)

@@ -89,7 +89,16 @@ object PortalRules {
         PortalStyle.SageCeramic, PortalStyle.Extruded -> choice == PortalColor.Olive
         PortalStyle.FloatingCeramic -> choice == PortalColor.Cream
         PortalStyle.Glass -> choice == PortalColor.Cream
+        PortalStyle.Mustard -> choice == PortalColor.Gold || choice == PortalColor.Auto
     }
+
+    /**
+     * Picking a button style in the menu. A gold mark vanishes on the mustard disc, so that
+     * one switches the mark to charcoal; any other colour choice is kept as it is.
+     */
+    fun withStyle(s: PortalSettings, style: PortalStyle): PortalSettings =
+        if (style == PortalStyle.Mustard && lowContrast(s.color, style)) s.copy(style = style, color = PortalColor.Charcoal)
+        else s.copy(style = style)
 
     /**
      * The chosen apps that are still installed (in the order chosen), and how many aren't

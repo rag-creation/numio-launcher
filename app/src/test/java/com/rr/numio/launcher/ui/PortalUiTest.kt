@@ -130,10 +130,18 @@ class PortalUiTest {
 
     @Test fun everyStyleCanBePicked() {
         menu(PortalSettings(), hasWork = true)
-        for (st in PortalStyle.entries) {
+        for (st in PortalStyle.entries - PortalStyle.Mustard) {
             rule.onNodeWithContentDescription("${st.label} button").performScrollTo().performClick()
             rule.onNodeWithContentDescription("Preview, ${st.label}, Numio gold").performScrollTo().assertExists()
         }
+    }
+
+    @Test fun mustardDiscPreviewsWithACharcoalMark() {
+        menu(PortalSettings(), hasWork = true)
+        rule.onNodeWithContentDescription("Mustard button").performScrollTo().performClick()
+        rule.onNodeWithContentDescription("Preview, Mustard, Charcoal").performScrollTo().assertExists()
+        rule.onNodeWithText("Apply").performScrollTo().performClick()
+        rule.runOnIdle { assertEquals(PortalStyle.Mustard, applied!!.style); assertEquals(PortalColor.Charcoal, applied!!.color) }
     }
 
     @Test fun aQuickDoubleTapStillRunsTheActionOnce() {
