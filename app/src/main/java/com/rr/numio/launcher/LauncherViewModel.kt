@@ -12,6 +12,9 @@ import com.rr.numio.launcher.data.DefaultDock
 import com.rr.numio.launcher.data.GridItem
 import com.rr.numio.launcher.data.HomeGrid
 import com.rr.numio.launcher.data.Profiles
+import com.rr.numio.launcher.data.PortalRules
+import com.rr.numio.launcher.data.PortalSettings
+import com.rr.numio.launcher.data.PortalTap
 import com.rr.numio.launcher.data.WorkState
 import com.rr.numio.launcher.data.Slot
 import com.rr.numio.launcher.data.HomePrefs
@@ -162,18 +165,102 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    // ── The Numio logo (portal) ─────────────────────────────────────────────
+
+    val portal: StateFlow<PortalSettings> =
+        prefs.portal.stateIn(viewModelScope, SharingStarted.Eagerly, PortalSettings())
+
+    fun setPortal(settings: PortalSettings) {
+        viewModelScope.launch { prefs.setPortal(settings) }
+    }
+
+    /** Personal-profile apps only: what "Selected apps" can be chosen from. */
+    val personalApps: StateFlow<List<AppEntry>> =
+        repo.apps.filterNotNull().map { list -> list.filter { it.isMainUser } }
+            .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
+    /** The chosen apps still installed, and how many chosen ones aren't any more. */
+    val chosenApps: StateFlow<Pair<List<AppEntry>, Int>> =
+        combine(portal, personalApps) { p, apps -> PortalRules.chosen(p.apps, apps) { it.key } }
+            .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList<AppEntry>() to 0)
+
+    private val _selectedOpen = MutableStateFlow(false)
+    val selectedOpen: StateFlow<Boolean> = _selectedOpen.asStateFlow()
+
+    private val _pickerOpen = MutableStateFlow(false)
+    val pickerOpen: StateFlow<Boolean> = _pickerOpen.asStateFlow()
+
+    private val _portalSettingsOpen = MutableStateFlow(false)
+    val portalSettingsOpen: StateFlow<Boolean> = _portalSettingsOpen.asStateFlow()
+
+    /** Tap on the logo: whatever it's set to open. */
+    fun tapPortal() {
+        when (PortalRules.tap(portal.value, hasWorkProfile.value)) {
+            PortalTap.OpenWorkspace -> openWorkspace()
+            PortalTap.OpenSelected -> {
+                closeShelf()
+                _selectedOpen.value = true
+            }
+            PortalTap.Nothing -> Unit
+            PortalTap.NoWorkProfile -> Toast.makeText(
+                getApplication(),
+                "There's no work profile on this phone. Long-press the logo to choose what it opens",
+                Toast.LENGTH_LONG,
+            ).show()
+        }
+    }
+
+    fun openPortalSettings() {
+        _portalSettingsOpen.value = true
+    }
+
+    fun closePortalSettings() {
+        _portalSettingsOpen.value = false
+    }
+
+    fun closeSelected() {
+        _selectedOpen.value = false
+    }
+
+    fun openPicker() {
+        _pickerOpen.value = true
+    }
+
+    fun closePicker() {
+        _pickerOpen.value = false
+    }
+
+    fun toggleChosen(entry: AppEntry) {
+        if (!entry.isMainUser) return  // only personal apps
+        val p = portal.value
+        setPortal(p.copy(apps = PortalRules.toggle(p.apps, entry.key)))
+    }
+
+    /** Drop chosen apps that aren't installed any more. */
+    fun forgetMissingChosen() {
+        val p = portal.value
+        val present = personalApps.value.map { it.key }.toSet()
+        setPortal(p.copy(apps = p.apps.filter { it in present }))
+    }
+
     /** Sol's home grid, always valid for the current screen (see [HomeGrid.normalize]). */
     val gridItems: StateFlow<List<GridItem>> =
-        combine(appsByKey, prefs.solGrid, prefs.homeApps, gridRows, hasWorkProfile) { apps, saved, legacy, rows, work ->
+        combine(appsByKey, prefs.solGrid, prefs.homeApps, gridRows, portal) { apps, saved, legacy, rows, p ->
             val items = if (saved != null) HomeGrid.parse(saved)
             else HomeGrid.fromLegacy(Cells.pad(legacy, HomePrefs.HOME_MAX), rows)
-            HomeGrid.normalize(items, rows, apps.keys, portal = work)
+            HomeGrid.normalize(items, rows, apps.keys, portal = p.visible)
         }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
+    /** The grid as last saved, to keep a hidden logo's place. */
+    private val savedGrid: StateFlow<String?> = prefs.solGrid.stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
     private fun keys(cells: List<AppEntry?>) = cells.map { it?.key }
 
+    private fun withHiddenPortal(items: List<GridItem>) =
+        HomeGrid.keepHidden(items, savedGrid.value?.let(HomeGrid::parse).orEmpty())
+
     private fun saveGrid(items: List<GridItem>) {
-        viewModelScope.launch { prefs.setSolGrid(HomeGrid.serialize(items)) }
+        viewModelScope.launch { prefs.setSolGrid(HomeGrid.serialize(withHiddenPortal(items))) }
     }
 
     fun isOnHome(entry: AppEntry) = gridItems.value.any { it.id == entry.key }
@@ -200,7 +287,7 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
     /** Drag on Sol's home or dock. Widgets go into free space; apps move or swap, grid ↔ dock too. */
     fun drop(from: Slot, to: Slot) {
         val (grid, dock) = HomeGrid.move(gridItems.value, keys(dockCells.value), gridRows.value, from, to) ?: return
-        viewModelScope.launch { prefs.setGridAndDock(HomeGrid.serialize(grid), dock) }
+        viewModelScope.launch { prefs.setGridAndDock(HomeGrid.serialize(withHiddenPortal(grid)), dock) }
     }
 
     /** Widgets back to the top, apps onto the bottom rows in reading order. */
@@ -209,7 +296,7 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
         val rows = gridRows.value
         val first = HomeGrid.fromLegacy(apps.take(HomePrefs.HOME_MAX), rows)
         val rest = apps.drop(HomePrefs.HOME_MAX).map { GridItem(it, -1, -1, 1, 1) }
-        saveGrid(HomeGrid.normalize(first + rest, rows, appsByKey.value.keys, portal = hasWorkProfile.value))
+        saveGrid(HomeGrid.normalize(first + rest, rows, appsByKey.value.keys, portal = portal.value.visible))
     }
 
     /** Search results; with no query, every app A–Z. */
@@ -249,6 +336,9 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
     fun goHome() {
         closeShelf()
         closeWorkspace()
+        _selectedOpen.value = false
+        _pickerOpen.value = false
+        _portalSettingsOpen.value = false
     }
 
     fun setQuery(q: String) {

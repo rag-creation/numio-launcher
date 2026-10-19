@@ -103,6 +103,16 @@ object HomeGrid {
 
     fun itemAt(items: List<GridItem>, c: Int, r: Int): GridItem? = items.firstOrNull { it.covers(c, r) }
 
+    /**
+     * Saving while the logo is hidden: it's not on the visible grid, but its last place is
+     * carried over from [previous] so showing it again puts it back where it was.
+     */
+    fun keepHidden(items: List<GridItem>, previous: List<GridItem>): List<GridItem> {
+        if (items.any { it.id == PORTAL }) return items
+        val hidden = previous.firstOrNull { it.id == PORTAL } ?: return items
+        return items + hidden
+    }
+
     // ── moving ──────────────────────────────────────────────────────────────
 
     /**

@@ -43,6 +43,9 @@ import com.rr.numio.launcher.ui.CanvasScreen
 import com.rr.numio.launcher.ui.NumioTheme
 import com.rr.numio.launcher.ui.ShelfScreen
 import com.rr.numio.launcher.ui.WorkspaceScreen
+import com.rr.numio.launcher.ui.SelectedAppsScreen
+import com.rr.numio.launcher.ui.PortalSettingsDialog
+import com.rr.numio.launcher.ui.AppPickerDialog
 import com.rr.numio.launcher.ui.SolColors
 import com.rr.numio.launcher.ui.SolScreen
 import com.rr.numio.launcher.ui.homeColors
@@ -113,7 +116,10 @@ class MainActivity : ComponentActivity() {
         BackHandler { }
 
         val workspace by vm.workspaceOpen.collectAsStateWithLifecycle()
-        val open = shelf != ShelfMode.Closed || workspace
+        val selected by vm.selectedOpen.collectAsStateWithLifecycle()
+        val portalSettings by vm.portalSettingsOpen.collectAsStateWithLifecycle()
+        val picker by vm.pickerOpen.collectAsStateWithLifecycle()
+        val open = shelf != ShelfMode.Closed || workspace || selected
         // Canvas steps back a little as the Shelf comes up, so they feel like one space
         val canvasScale by animateFloatAsState(if (open) 0.94f else 1f, tween(260), label = "canvasScale")
         val canvasAlpha by animateFloatAsState(if (open) 0f else 1f, tween(220), label = "canvasAlpha")
@@ -167,7 +173,18 @@ class MainActivity : ComponentActivity() {
             ) {
                 WorkspaceScreen(vm)
             }
+            // "Selected apps": the personal apps chosen for the Numio logo
+            AnimatedVisibility(
+                visible = selected,
+                enter = slideInVertically(tween(260)) { it / 8 } + fadeIn(tween(200)),
+                exit = slideOutVertically(tween(220)) { it / 8 } + fadeOut(tween(180)),
+            ) {
+                SelectedAppsScreen(vm)
+            }
         }
+        // Dialogs open in their own windows; the picker opens last so it sits on top
+        if (portalSettings) PortalSettingsDialog(vm, theme)
+        if (picker) AppPickerDialog(vm)
     }
 
     override fun onNewIntent(intent: Intent) {

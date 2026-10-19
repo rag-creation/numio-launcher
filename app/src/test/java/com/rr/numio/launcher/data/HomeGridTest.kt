@@ -140,4 +140,22 @@ class HomeGridTest {
         val reloaded = HomeGrid.normalize(HomeGrid.parse(HomeGrid.serialize(moved)), rows, emptySet(), portal = true)
         assertEquals(GridItem(HomeGrid.PORTAL, 1, 6, 1, 1), reloaded.find(HomeGrid.PORTAL))
     }
+
+    @Test fun hidingTheLogoFreesItsCellAndKeepsItsPlaceForLater() {
+        val shown = withPortal()
+        val (moved, _) = HomeGrid.move(shown, emptyList(), rows, cell(4, 2), cell(2, 7))!!   // logo to (2,7)
+        // hidden: not on the visible grid, so its cell takes an app…
+        val hidden = HomeGrid.normalize(moved, rows, setOf("a"), portal = false)
+        assertTrue(hidden.none { it.id == HomeGrid.PORTAL })
+        assertNotNull(HomeGrid.move(hidden + app("a", 0, 7), emptyList(), rows, cell(0, 7), cell(3, 7)))
+        // …but saving keeps its last place, so showing it again puts it back
+        val saved = HomeGrid.keepHidden(hidden, previous = moved)
+        val again = HomeGrid.normalize(HomeGrid.parse(HomeGrid.serialize(saved)), rows, emptySet(), portal = true)
+        assertEquals(GridItem(HomeGrid.PORTAL, 2, 7, 1, 1), again.find(HomeGrid.PORTAL))
+    }
+
+    @Test fun keepHiddenDoesNothingWhenTheLogoIsShown() {
+        val shown = withPortal()
+        assertEquals(shown, HomeGrid.keepHidden(shown, previous = shown))
+    }
 }

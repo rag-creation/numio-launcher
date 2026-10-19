@@ -49,6 +49,25 @@ class HomePrefs(context: Context) {
         store.edit { it[HOME_APPS] = cells.joinToString("\n") { k -> k.orEmpty() } }
     }
 
+    /** The Numio logo: each setting saved on its own key, so none resets another. */
+    val portal: Flow<PortalSettings> = store.data.map { p ->
+        PortalSettings(
+            visible = p[PORTAL_VISIBLE] ?: true,
+            action = PortalAction.of(p[PORTAL_ACTION]),
+            color = PortalColor.of(p[PORTAL_COLOR]),
+            apps = p[PORTAL_APPS]?.split('\n')?.filter { it.isNotEmpty() }.orEmpty(),
+        )
+    }
+
+    suspend fun setPortal(s: PortalSettings) {
+        store.edit {
+            it[PORTAL_VISIBLE] = s.visible
+            if (s.action == null) it.remove(PORTAL_ACTION) else it[PORTAL_ACTION] = s.action.id
+            it[PORTAL_COLOR] = s.color.id
+            it[PORTAL_APPS] = s.apps.joinToString("\n")
+        }
+    }
+
     /** Sol's home grid (see [HomeGrid.serialize]); null until it's first changed. */
     val solGrid: Flow<String?> = store.data.map { p -> p[SOL_GRID] }
 
@@ -122,5 +141,9 @@ class HomePrefs(context: Context) {
         private val HOME_APPS = stringPreferencesKey("home_apps")
         private val SOL_CLOCK = stringPreferencesKey("sol_clock")
         private val SOL_GRID = stringPreferencesKey("sol_grid")
+        private val PORTAL_VISIBLE = booleanPreferencesKey("portal_visible")
+        private val PORTAL_ACTION = stringPreferencesKey("portal_action")
+        private val PORTAL_COLOR = stringPreferencesKey("portal_color")
+        private val PORTAL_APPS = stringPreferencesKey("portal_apps")
     }
 }

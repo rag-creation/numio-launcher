@@ -28,7 +28,9 @@ class WorkspaceUiTest {
     @Test fun portalUsesTheOfficialMarkAndOpensTheWorkspace() {
         assertEquals(R.drawable.numio_mark, NumioMark.RES)
         var opened = 0
-        rule.setContent { WorkspacePortal(colors, onOpen = { opened++ }) }
+        rule.setContent {
+            PortalButton(tint = null, description = PORTAL_DESCRIPTION, onTap = { opened++ }, onLongPress = {})
+        }
         rule.onNodeWithContentDescription(PORTAL_DESCRIPTION).assertHasClickAction().performClick()
         rule.runOnIdle { assertEquals(1, opened) }
     }

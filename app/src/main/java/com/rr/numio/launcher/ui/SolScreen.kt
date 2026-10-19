@@ -80,6 +80,8 @@ import com.rr.numio.launcher.R
 import com.rr.numio.launcher.ShelfMode
 import com.rr.numio.launcher.data.AppEntry
 import com.rr.numio.launcher.data.Slot
+import com.rr.numio.launcher.data.HomeTheme
+import com.rr.numio.launcher.data.PortalRules
 import com.rr.numio.launcher.data.HomeGrid
 import com.rr.numio.launcher.data.GridItem
 import com.rr.numio.launcher.data.SolClock
@@ -129,6 +131,8 @@ fun SolScreen(
     val showCalendar by vm.showCalendar.collectAsStateWithLifecycle()
     val wallpaper by vm.solWallpaper.collectAsStateWithLifecycle()
     val clockStyle by vm.solClock.collectAsStateWithLifecycle()
+    val portal by vm.portal.collectAsStateWithLifecycle()
+    val hasWork by vm.hasWorkProfile.collectAsStateWithLifecycle()
     val swipe = with(LocalDensity.current) { 56.dp.toPx() }
     val now = rememberNow()
 
@@ -194,6 +198,10 @@ fun SolScreen(
                 onOpenClock = onOpenClock,
                 onOpenEvent = onOpenEvent,
                 onOpenCalendar = onOpenCalendar,
+                portalTint = PortalRules.color(portal.color, HomeTheme.Sol),
+                portalDescription = portalDescription(PortalRules.tap(portal, hasWork)),
+                onTapPortal = vm::tapPortal,
+                onPortalMenu = vm::openPortalSettings,
                 menuItems = { close ->
                     fun tick(on: Boolean, label: String) = if (on) "✓  $label" else label
                     DropdownMenuItem(
@@ -207,6 +215,10 @@ fun SolScreen(
                     DropdownMenuItem(
                         text = { Text(tick(showCalendar, "Show next calendar event")) },
                         onClick = { close(); onToggleCalendar() },
+                    )
+                    DropdownMenuItem(
+                        text = { Text(if (portal.visible) "Numio logo…" else "Numio logo… (hidden)") },
+                        onClick = { close(); vm.openPortalSettings() },
                     )
                     DropdownMenuItem(text = { Text("Reset home layout") }, onClick = { close(); vm.resetHomeLayout() })
                     DropdownMenuItem(text = { Text("Switch to Ink theme") }, onClick = { close(); onSwitchTheme() })
@@ -250,6 +262,10 @@ private fun SolHomeGrid(
     onOpenClock: () -> Unit,
     onOpenEvent: (Long, Long) -> Unit,
     onOpenCalendar: () -> Unit,
+    portalTint: Long?,
+    portalDescription: String,
+    onTapPortal: () -> Unit,
+    onPortalMenu: () -> Unit,
     menuItems: @Composable (close: () -> Unit) -> Unit,
     modifier: Modifier,
 ) {
@@ -329,7 +345,9 @@ private fun SolHomeGrid(
                             .zIndex(if (placement.dragging == slot) 1f else 0f),
                         contentAlignment = if (item.isWidget) Alignment.TopStart else Alignment.Center,
                     ) {
-                        if (!item.isWidget) {
+                        if (item.id == HomeGrid.PORTAL) {
+                            PortalWidget(slot, placement, portalTint, portalDescription, onTapPortal, onPortalMenu)
+                        } else if (!item.isWidget) {
                             apps[item.id]?.let { entry ->
                                 AppTile(
                                     entry, vm, colors, iconSize = 56.dp, showLabel = false,
@@ -350,7 +368,6 @@ private fun SolHomeGrid(
                                 onOpenEvent = onOpenEvent,
                                 onOpenCalendar = onOpenCalendar,
                                 onPickStyle = vm::setSolClock,
-                                onOpenWorkspace = vm::openWorkspace,
                             )
                         }
                     }
@@ -380,6 +397,44 @@ private fun SolHomeGrid(
 }
 
 /**
+ * The Numio logo on Sol's grid: the bare mark, with only a 56dp area around it touchable (the
+ * rest of its cell lets gestures through). Tap does what it's set to; hold and release opens
+ * the customization menu (never also a tap); hold and move drags it like any widget.
+ */
+@Composable
+private fun PortalWidget(
+    slot: Slot,
+    placement: Placement,
+    tint: Long?,
+    description: String,
+    onTap: () -> Unit,
+    onMenu: () -> Unit,
+) {
+    val haptics = LocalHapticFeedback.current
+    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier
+                .size(56.dp)
+                .semantics {
+                    contentDescription = description
+                    onClick(label = description) { onTap(); true }
+                    onLongClick(label = "Customize the Numio logo") { onMenu(); true }
+                }
+                .appCell(
+                    placement, slot, HomeGrid.PORTAL,
+                    onTap = onTap,
+                    onHoldStart = { haptics.performHapticFeedback(HapticFeedbackType.LongPress) },
+                    onMenu = onMenu,
+                    register = false,
+                ),
+        ) {
+            NumioLogo(tint, 44.dp)
+        }
+    }
+}
+
+/**
  * A widget on the grid. Hold and move it to drag it into free space; a tap goes to the
  * widget itself (open the clock or calendar). Holding the clock without moving opens its
  * style picker. While anything is dragged, widgets show a faint outline of the space they take.
@@ -397,30 +452,23 @@ private fun GridWidget(
     onOpenEvent: (Long, Long) -> Unit,
     onOpenCalendar: () -> Unit,
     onPickStyle: (SolClock) -> Unit,
-    onOpenWorkspace: () -> Unit,
 ) {
     val haptics = LocalHapticFeedback.current
     var picker by remember { mutableStateOf(false) }
     val onTap: () -> Unit = when (id) {
         HomeGrid.CLOCK -> onOpenClock
         HomeGrid.MONTH -> onOpenCalendar
-        HomeGrid.PORTAL -> onOpenWorkspace
         else -> ({})
     }
     val label = when (id) {
         HomeGrid.CLOCK -> "Clock"
         HomeGrid.MONTH -> "Calendar"
-        HomeGrid.PORTAL -> "Workspace"
         else -> "Next alarm"
     }
     Box(
         Modifier
             .fillMaxSize()
             .semantics {
-                if (id == HomeGrid.PORTAL) {
-                    contentDescription = PORTAL_DESCRIPTION
-                    onClick(label = PORTAL_DESCRIPTION) { onOpenWorkspace(); true }
-                }
                 onLongClick(label = if (id == HomeGrid.CLOCK) "Change clock style" else "Move $label") {
                     if (id == HomeGrid.CLOCK) picker = true
                     true
@@ -440,7 +488,6 @@ private fun GridWidget(
             ),
         contentAlignment = when (id) {
             HomeGrid.TODAY -> Alignment.CenterStart
-            HomeGrid.PORTAL -> Alignment.Center
             else -> Alignment.TopStart
         },
     ) {
@@ -448,7 +495,6 @@ private fun GridWidget(
             HomeGrid.CLOCK -> SolClockView(colors, now, clockStyle, picker, { picker = false }, onPickStyle)
             HomeGrid.TODAY -> SolToday(colors, now, showCalendar, onOpenClock, onOpenEvent)
             HomeGrid.MONTH -> MonthCard(now, showCalendar, onOpenCalendar, Modifier.fillMaxWidth().padding(end = 8.dp))
-            HomeGrid.PORTAL -> WorkspacePortal(colors)
         }
     }
 }

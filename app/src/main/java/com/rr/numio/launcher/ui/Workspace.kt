@@ -29,8 +29,15 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import com.rr.numio.launcher.data.PortalTap
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.runtime.remember
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
@@ -51,34 +58,61 @@ object NumioMark {
     val RES = R.drawable.numio_mark
 }
 
-/** Charcoal, like the website the mark comes from, so its amber reads on any theme. */
-private val PortalDisc = Color(0xF2282520)
-
 const val PORTAL_DESCRIPTION = "Open Workspace"
 
+/** What screen readers hear for the logo, matching what a tap does. */
+fun portalDescription(tap: PortalTap): String = when (tap) {
+    PortalTap.OpenWorkspace -> PORTAL_DESCRIPTION
+    PortalTap.OpenSelected -> "Open your chosen apps"
+    PortalTap.Nothing, PortalTap.NoWorkProfile -> "Numio logo"
+}
+
 /**
- * The Workspace portal: the official Numio mark on a small charcoal disc, ringed faintly in
- * the theme's gold. With [onOpen] it's its own button (Ink); without, its container handles
- * taps (Sol's grid, where it can also be dragged like any widget).
+ * The official mark on its own, nothing behind it. With [tint] null it's drawn exactly as
+ * the artwork is (the official amber); otherwise it's tinted at draw time, never changing
+ * the asset itself.
  */
 @Composable
-fun WorkspacePortal(colors: NumioColors, modifier: Modifier = Modifier, onOpen: (() -> Unit)? = null) {
+fun NumioLogo(tint: Long?, size: Dp, modifier: Modifier = Modifier) {
+    Image(
+        painterResource(NumioMark.RES),
+        contentDescription = null,
+        colorFilter = tint?.let { ColorFilter.tint(Color(it)) },
+        modifier = modifier.size(size),
+    )
+}
+
+/**
+ * Ink's logo: the bare mark with an invisible 56dp touch area around it.
+ * Tap does what it's set to; long-press opens the customization menu (and never also taps).
+ */
+@Composable
+fun PortalButton(
+    tint: Long?,
+    description: String,
+    onTap: () -> Unit,
+    onLongPress: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val haptics = LocalHapticFeedback.current
     Box(
-        modifier
-            .size(52.dp)
-            .shadow(3.dp, CircleShape, clip = false)
-            .background(PortalDisc, CircleShape)
-            .border(1.dp, colors.gold.copy(alpha = 0.4f), CircleShape)
-            .then(
-                if (onOpen != null) {
-                    Modifier
-                        .semantics { contentDescription = PORTAL_DESCRIPTION }
-                        .clickable(role = Role.Button, onClickLabel = PORTAL_DESCRIPTION, onClick = onOpen)
-                } else Modifier
-            ),
         contentAlignment = Alignment.Center,
+        modifier = modifier
+            .size(56.dp)
+            .semantics { contentDescription = description }
+            .combinedClickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                role = Role.Button,
+                onClick = onTap,
+                onLongClickLabel = "Customize the Numio logo",
+                onLongClick = {
+                    haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                    onLongPress()
+                },
+            ),
     ) {
-        Image(painterResource(NumioMark.RES), contentDescription = null, modifier = Modifier.size(32.dp))
+        NumioLogo(tint, 44.dp)
     }
 }
 

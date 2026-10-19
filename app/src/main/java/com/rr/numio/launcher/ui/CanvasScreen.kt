@@ -68,6 +68,8 @@ import com.rr.numio.launcher.LauncherViewModel
 import com.rr.numio.launcher.ShelfMode
 import com.rr.numio.launcher.data.AppEntry
 import com.rr.numio.launcher.data.Background
+import com.rr.numio.launcher.data.HomeTheme
+import com.rr.numio.launcher.data.PortalRules
 import com.rr.numio.launcher.data.TodaySource
 import com.rr.numio.launcher.sketch.SketchInk
 import kotlinx.coroutines.Dispatchers
@@ -100,6 +102,7 @@ fun CanvasScreen(
     val bg by vm.background.collectAsStateWithLifecycle()
     val showCalendar by vm.showCalendar.collectAsStateWithLifecycle()
     val hasWork by vm.hasWorkProfile.collectAsStateWithLifecycle()
+    val portal by vm.portal.collectAsStateWithLifecycle()
     val swipe = with(LocalDensity.current) { 56.dp.toPx() }
     val now = rememberNow()
 
@@ -143,6 +146,8 @@ fun CanvasScreen(
                 onBackground = vm::setBackground,
                 onToggleCalendar = onToggleCalendar,
                 onSwitchTheme = onSwitchTheme,
+                onPortalSettings = vm::openPortalSettings,
+                portalVisible = portal.visible,
                 onRequestHome = onRequestHome,
                 onLauncherInfo = onOpenLauncherInfo,
                 modifier = Modifier.weight(1f).fillMaxWidth(),
@@ -154,16 +159,18 @@ fun CanvasScreen(
             Spacer(Modifier.height(16.dp))
         }
 
-        // Ink: the Workspace portal sits at a fixed spot, top right, level with the open sky
-        // above the clock (Ink has no grid to place it on). Only when there's a work profile.
-        if (hasWork) {
-            WorkspacePortal(
-                colors,
-                Modifier
+        // Ink: the Numio logo sits at a fixed spot, top right, in the open space above the
+        // clock (Ink has no grid to place it on). Hidden entirely when turned off.
+        if (portal.visible) {
+            PortalButton(
+                tint = PortalRules.color(portal.color, HomeTheme.Ink),
+                description = portalDescription(PortalRules.tap(portal, hasWork)),
+                onTap = vm::tapPortal,
+                onLongPress = vm::openPortalSettings,
+                modifier = Modifier
                     .align(Alignment.TopEnd)
                     .statusBarsPadding()
-                    .padding(top = 20.dp, end = 20.dp),
-                onOpen = vm::openWorkspace,
+                    .padding(top = 16.dp, end = 16.dp),
             )
         }
     }
@@ -397,6 +404,8 @@ private fun CanvasMenuArea(
     onBackground: (Background) -> Unit,
     onToggleCalendar: () -> Unit,
     onSwitchTheme: () -> Unit,
+    onPortalSettings: () -> Unit,
+    portalVisible: Boolean,
     onRequestHome: () -> Unit,
     onLauncherInfo: () -> Unit,
     modifier: Modifier,
@@ -437,6 +446,10 @@ private fun CanvasMenuArea(
                 DropdownMenuItem(
                     text = { Text(tick(showCalendar, "Show next calendar event")) },
                     onClick = { menuAt = null; onToggleCalendar() },
+                )
+                DropdownMenuItem(
+                    text = { Text(if (portalVisible) "Numio logo…" else "Numio logo… (hidden)") },
+                    onClick = { menuAt = null; onPortalSettings() },
                 )
                 DropdownMenuItem(text = { Text("Switch to Sol theme") }, onClick = { menuAt = null; onSwitchTheme() })
                 if (!isDefault) {
