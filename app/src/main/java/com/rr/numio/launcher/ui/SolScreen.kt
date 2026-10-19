@@ -35,6 +35,7 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -297,27 +298,30 @@ private fun SolHomeGrid(
             it.x in 0f..with(density) { maxWidth.toPx() } && it.y in 0f..with(density) { maxHeight.toPx() }
         }
         val sunSlot = Slot(Slot.SUN, 0)
+        // Register the sun as a drop spot whenever its place is known or changes. (It used to
+        // be done only at layout time, which can come before the sun's position is worked
+        // out, so the spot was never added.)
+        SideEffect {
+            placement.slots.remove(sunSlot)
+            val sw = sun
+            if (sw != null && sunLocal != null) {
+                placement.slots[sunSlot] = Rect(sw.x - logoHalf, sw.y - logoHalf, sw.x + logoHalf, sw.y + logoHalf)
+            }
+        }
 
         Box(
             Modifier
                 .fillMaxSize()
-                // the grid reports every cell's place on screen, filled or not, and the sun's
+                // the grid reports every cell's place on screen, filled or not
                 .onGloballyPositioned { coords ->
                     val o = coords.boundsInWindow().topLeft
                     origin = o
                     val cw = coords.size.width / cols.toFloat()
                     val ch = coords.size.height / rows.toFloat()
-                    placement.slots.keys.removeAll { it.area == Slot.HOME || it.area == Slot.SUN }
+                    placement.slots.keys.removeAll { it.area == Slot.HOME }
                     for (r in 0 until rows) for (c in 0 until cols) {
                         placement.slots[Slot(Slot.HOME, r * cols + c)] =
                             Rect(o.x + c * cw, o.y + r * ch, o.x + (c + 1) * cw, o.y + (r + 1) * ch)
-                    }
-                    val sw = sun
-                    if (sw != null) {
-                        val local = sw - o
-                        if (local.x in 0f..coords.size.width.toFloat() && local.y in 0f..coords.size.height.toFloat()) {
-                            placement.slots[sunSlot] = Rect(sw.x - logoHalf, sw.y - logoHalf, sw.x + logoHalf, sw.y + logoHalf)
-                        }
                     }
                 }
         ) {
