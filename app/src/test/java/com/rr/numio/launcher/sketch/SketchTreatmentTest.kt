@@ -37,6 +37,20 @@ class SketchTreatmentTest {
         return b
     }
 
+    /** A stand-in for an app's monochrome layer: a thin cross, well under half the disc. */
+    private fun thinMark() = object : android.graphics.drawable.Drawable() {
+        override fun draw(canvas: Canvas) {
+            val b = bounds
+            val p = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFF000000.toInt(); strokeWidth = b.width() * 0.04f }
+            canvas.drawLine(b.left + b.width() * 0.35f, b.exactCenterY(), b.right - b.width() * 0.35f, b.exactCenterY(), p)
+            canvas.drawLine(b.exactCenterX(), b.top + b.height() * 0.35f, b.exactCenterX(), b.bottom - b.height() * 0.35f, p)
+        }
+        override fun setAlpha(alpha: Int) {}
+        override fun setColorFilter(cf: android.graphics.ColorFilter?) {}
+        @Deprecated("Deprecated in Java")
+        override fun getOpacity() = android.graphics.PixelFormat.TRANSLUCENT
+    }
+
     private fun inked(b: Bitmap) = IntArray(px * px).also { b.getPixels(it, 0, px, 0, 0, px, px) }.map { (it ushr 24) > 128 }
 
     @Test fun silhouetteStaysButTheLineChanges() {
@@ -64,7 +78,7 @@ class SketchTreatmentTest {
         fun draw(mono: Boolean, derived: Bitmap?): Bitmap {
             val b = Bitmap.createBitmap(px, px, Bitmap.Config.ARGB_8888)
             SketchIcons.paint(context, Canvas(b), px, 7, "Zebra", null, true, derived = { _, _ -> derived }) {
-                if (mono) ContextCompat.getDrawable(context, R.drawable.numio_mark_n) else null
+                if (mono) thinMark() else null
             }
             return b
         }
