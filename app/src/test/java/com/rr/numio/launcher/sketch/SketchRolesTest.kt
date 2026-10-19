@@ -135,7 +135,9 @@ class SketchRolesTest {
 
     @Test fun everyJobHasAWayToBeFound() {
         val intents = SketchRoles.intents()
-        for (k in SketchKind.entries) assertTrue("$k has no intent", intents[k].orEmpty().isNotEmpty())
+        for (k in SketchKind.entries.filter { it.main }) assertTrue("$k has no intent", intents[k].orEmpty().isNotEmpty())
+        // variants are only ever picked by hand
+        for (k in SketchKind.entries.filter { !it.main }) assertTrue("$k must not be detected", intents[k] == null)
     }
 
     @Test fun sketchSymbolsAreForInkOnly() {

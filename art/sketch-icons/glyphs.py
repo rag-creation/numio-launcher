@@ -240,6 +240,62 @@ GLYPHS["recorder"] = [
     ("hatch", hatch(50, 51, 2, 6, 4.4)),
 ]
 
+# ── variants: more than one drawing for a kind of app, so two clocks can differ ──
+# (picked by hand; automatic detection always uses the first drawing of each kind)
+
+# Alarm clock: a face with two bells and two feet
+face = arc(50, 54, 19, 0, 360) + " Z"
+bell_l = "M26.5,37 C24.8,29.8 29.8,24 36.6,24.8 C39.2,25.1 41.3,26.4 42.7,28.3 Z"
+bell_r = "M73.5,37 C75.2,29.8 70.2,24 63.4,24.8 C60.8,25.1 58.7,26.4 57.3,28.3 Z"
+GLYPHS["alarmclock"] = [
+    ("fill", "CREAM", bell_l), ("fill", "CREAM", bell_r), ("fill", "CREAM", face),
+    ("ink", bell_l), ("ink", bell_r),
+    ("ink", arc(50, 54, 19, -100, 366)),
+    ("ink", "M37,69.5 L33,76"), ("ink", "M63,69.5 L67,76"),
+    ("hatch", hatch(50, 68.5)),
+    ("ink", "M50,54 L50,43"), ("ink", "M50,54 L58,58.5"),
+    ("dot", "INK", 50, 54, 2.6),
+]
+
+# Pocket watch: bow, crown, a bezel and hands at twenty to twelve
+watch = arc(50, 56, 20, 0, 360) + " Z"
+crown = rrect(45.5, 30.5, 54.5, 36, 1.5)
+GLYPHS["pocketwatch"] = [
+    ("fill", "CREAM", watch), ("fill", "CREAM", crown),
+    ("ink", arc(50, 25.5, 4.6, -80, 365)),
+    ("ink", crown),
+    ("ink", arc(50, 56, 20, -95, 367)),
+    ("thin", "INK", arc(50, 56, 15.5, -30, 300)),
+    ("ink", "M50,56 L50,43"), ("ink", "M50,56 L43,61.5"),
+    ("dot", "INK", 50, 56, 2.6),
+]
+
+# Desk calendar: a page under a row of spiral rings, with written lines
+desk = rrect(25, 31, 75, 74, 5)
+GLYPHS["deskcalendar"] = [
+    ("fill", "CREAM", desk),
+    ("ink", desk),
+    ("ink", "M26,41 L74,41"),
+    ("thin", "INK", "M33,26 L33,35.5"), ("thin", "INK", "M41.5,26 L41.5,35.5"),
+    ("thin", "INK", "M50,26 L50,35.5"), ("thin", "INK", "M58.5,26 L58.5,35.5"),
+    ("thin", "INK", "M67,26 L67,35.5"),
+    ("thin", "INK", "M32,50.5 L66,50.5"),
+    ("thin", "INK", "M32,58.5 L57,58.5"),
+    ("thin", "INK", "M32,66.5 L62,66.5"),
+]
+
+# Agenda: a notebook page with a ribbon and a bulleted list
+book = rrect(27, 24, 73, 76, 5)
+GLYPHS["agenda"] = [
+    ("fill", "CREAM", book),
+    ("ink", book),
+    ("thin", "INK", "M61,24.5 L61,36.5 L64.5,33.5 L68,36.5 L68,24.5"),
+    ("dot", "INK", 35, 43, 2.5), ("thin", "INK", "M40.5,43 L56,43"),
+    ("dot", "INK", 35, 53.5, 2.5), ("thin", "INK", "M40.5,53.5 L63,53.5"),
+    ("dot", "INK", 35, 64, 2.5), ("thin", "INK", "M40.5,64 L59,64"),
+    ("hatch", hatch(55, 73)),
+]
+
 # ── one size for all: every drawing fits inside the same inner circle ─────────
 
 FIT_R = 28.0   # grid units from the centre; keeps clear paper between symbol and ring
@@ -281,6 +337,9 @@ COLOURS = {"INK": 0xFF1C1A17, "CREAM": 0xFFFFF9EE, "GOLD": 0xFFC9962E}
 PAPER = 0xFFF6ECD6
 
 
+KT_NAMES = {"alarmclock": "AlarmClock", "pocketwatch": "PocketWatch", "deskcalendar": "DeskCalendar"}
+
+
 def kotlin():
     lines = []
     for name, layers in GLYPHS.items():
@@ -298,7 +357,7 @@ def kotlin():
             elif L[0] == "dot":
                 items.append(f"Layer.Dot(Tone.{L[1]}, {f(L[2])}f, {f(L[3])}f, {f(L[4])}f)")
         body = ",\n            ".join(items)
-        lines.append(f"        SketchKind.{name.capitalize()} to listOf(\n            {body},\n        ),")
+        lines.append(f"        SketchKind.{KT_NAMES.get(name, name.capitalize())} to listOf(\n            {body},\n        ),")
     return "\n".join(lines)
 
 

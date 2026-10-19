@@ -27,15 +27,21 @@ enum class SketchKind(
     /** Whole names that say exactly this ("Gallery", "My Files"); they win over a mere
      *  mention ("Edge Gallery") when several apps do the same job. */
     val titles: List<String> = emptyList(),
+    /** False for a variant drawing (a second clock, say): picked by hand, never automatic. */
+    val main: Boolean = true,
 ) {
     Phone("Phone", listOf("phone", "dial", "call"), listOf("phone")),
     Messages("Messages", listOf("message", "sms", "chat"), listOf("messages", "messaging")),
     Camera("Camera", listOf("camera"), listOf("camera")),
     Settings("Settings", listOf("setting"), listOf("settings")),
     Calendar("Calendar", listOf("calendar"), listOf("calendar")),
+    DeskCalendar("Desk calendar", emptyList(), main = false),
+    Agenda("Agenda", emptyList(), main = false),
     Browser("Browser", listOf("browser", "internet", "web"), listOf("browser", "internet")),
     Contacts("Contacts", listOf("contact", "people"), listOf("contacts")),
     Clock("Clock", listOf("clock", "alarm"), listOf("clock")),
+    AlarmClock("Alarm clock", emptyList(), main = false),
+    PocketWatch("Pocket watch", emptyList(), main = false),
     Files("Files", listOf("file"), listOf("files", "my files", "file manager")),
     Gallery("Gallery", listOf("gallery", "photo"), listOf("gallery")),
     Music("Music", listOf("music"), listOf("music")),
