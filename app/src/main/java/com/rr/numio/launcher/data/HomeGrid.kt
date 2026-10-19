@@ -22,6 +22,8 @@ object HomeGrid {
     const val MONTH = "w:month"
     /** The Workspace portal (official Numio mark); only shown when there's a work profile. */
     const val PORTAL = "w:portal"
+    /** Column and row of a logo that sits in the wallpaper's sun instead of a cell. */
+    const val SUN = -1
 
     /** Widgets, their sizes and where they start on a fresh layout. */
     private val widgets = listOf(
@@ -33,6 +35,9 @@ object HomeGrid {
     )
 
     fun isWidget(id: String) = id.startsWith("w:")
+
+    /** The logo is in the sun: on no cell, so it blocks nothing. */
+    fun inSun(it: GridItem) = it.id == PORTAL && it.col == SUN && it.row == SUN
 
     fun sizeOf(id: String): Pair<Int, Int> =
         widgets.firstOrNull { it.id == id }?.let { it.w to it.h } ?: (1 to 1)
@@ -85,7 +90,7 @@ object HomeGrid {
         val wanted = savedWidgets + saved.filter { !it.isWidget && it.id in installed } + newWidgets
         for (item in wanted) {
             if (!seen.add(item.id)) continue
-            val ok = inBounds(item, rows) && placed.none { it.overlaps(item) }
+            val ok = inSun(item) || (inBounds(item, rows) && placed.none { it.overlaps(item) })
             val spot = if (ok) item else firstFree(placed, rows, item.w, item.h)?.let { (c, r) -> item.copy(col = c, row = r) }
             if (spot != null) placed += spot
         }
@@ -120,6 +125,7 @@ object HomeGrid {
      *  - a widget moves into free space on the grid (never into the dock)
      *  - an app moves into an empty grid or dock cell, or swaps with the app there
      *  - nothing can be dropped on top of a widget
+     *  - the Numio logo can also go into the wallpaper's sun (Slot.SUN), and back out
      * Returns the new grid and dock, or null if the move isn't allowed.
      */
     fun move(
@@ -130,9 +136,18 @@ object HomeGrid {
         val d = dock.toMutableList()
 
         // what's being dragged
-        val source: GridItem? = if (from.area == Slot.HOME) {
-            grid.firstOrNull { it.col == from.index % COLS && it.row == from.index / COLS } ?: return null
-        } else null
+        val source: GridItem? = when (from.area) {
+            Slot.HOME -> grid.firstOrNull { !inSun(it) && it.col == from.index % COLS && it.row == from.index / COLS } ?: return null
+            Slot.SUN -> grid.firstOrNull { inSun(it) } ?: return null
+            else -> null
+        }
+
+        // the sun takes only the logo
+        if (to.area == Slot.SUN) {
+            if (source == null || source.id != PORTAL) return null
+            grid[grid.indexOf(source)] = source.copy(col = SUN, row = SUN)
+            return grid to d
+        }
         val dockKey: String? = if (from.area == Slot.DOCK) d.getOrNull(from.index) ?: return null else null
 
         if (to.area == Slot.DOCK) {

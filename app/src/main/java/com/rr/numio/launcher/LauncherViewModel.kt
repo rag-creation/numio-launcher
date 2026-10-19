@@ -13,6 +13,7 @@ import com.rr.numio.launcher.data.GridItem
 import com.rr.numio.launcher.data.HomeGrid
 import com.rr.numio.launcher.data.Profiles
 import com.rr.numio.launcher.data.PortalRules
+import com.rr.numio.launcher.data.PortalColor
 import com.rr.numio.launcher.data.PortalSettings
 import com.rr.numio.launcher.data.PortalTap
 import com.rr.numio.launcher.data.WorkState
@@ -288,6 +289,14 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
     fun drop(from: Slot, to: Slot) {
         val (grid, dock) = HomeGrid.move(gridItems.value, keys(dockCells.value), gridRows.value, from, to) ?: return
         viewModelScope.launch { prefs.setGridAndDock(HomeGrid.serialize(withHiddenPortal(grid)), dock) }
+        // the official gold almost disappears on the mustard sun; say which colours read well
+        if (to.area == Slot.SUN && portal.value.color in setOf(PortalColor.Gold, PortalColor.Auto)) {
+            Toast.makeText(
+                getApplication(),
+                "In the sun, Charcoal or Olive shows best. Long-press the logo to change its colour",
+                Toast.LENGTH_LONG,
+            ).show()
+        }
     }
 
     /** Widgets back to the top, apps onto the bottom rows in reading order. */

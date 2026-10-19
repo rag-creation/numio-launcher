@@ -158,4 +158,38 @@ class HomeGridTest {
         val shown = withPortal()
         assertEquals(shown, HomeGrid.keepHidden(shown, previous = shown))
     }
+
+    // ── the logo in the wallpaper's sun ────────────────────────────────────
+
+    private val sun = Slot(Slot.SUN, 0)
+
+    @Test fun logoGoesIntoTheSunAndBackToACell() {
+        val g = withPortal()
+        val (inSun, _) = HomeGrid.move(g, emptyList(), rows, cell(4, 2), sun)!!
+        assertTrue(HomeGrid.inSun(inSun.find(HomeGrid.PORTAL)))
+        val (back, _) = HomeGrid.move(inSun, emptyList(), rows, sun, cell(1, 7))!!
+        assertEquals(GridItem(HomeGrid.PORTAL, 1, 7, 1, 1), back.find(HomeGrid.PORTAL))
+    }
+
+    @Test fun onlyTheLogoFitsInTheSun() {
+        val g = withPortal(app("a", 0, 7))
+        assertNull(HomeGrid.move(g, emptyList(), rows, cell(0, 7), sun))         // an app
+        assertNull(HomeGrid.move(g, emptyList(), rows, cell(0, 0), sun))         // the clock
+        assertNull(HomeGrid.move(g, listOf("d"), rows, dock(0), sun))            // a dock app
+    }
+
+    @Test fun inTheSunTheLogoBlocksNoCell() {
+        val (inSun, _) = HomeGrid.move(withPortal(app("a", 0, 7)), emptyList(), rows, cell(4, 2), sun)!!
+        // its old cell is free for an app now
+        assertNotNull(HomeGrid.move(inSun, emptyList(), rows, cell(0, 7), cell(4, 2)))
+    }
+
+    @Test fun sunPlaceIsSavedAndSurvivesHiding() {
+        val (inSun, _) = HomeGrid.move(withPortal(), emptyList(), rows, cell(4, 2), sun)!!
+        val reloaded = HomeGrid.normalize(HomeGrid.parse(HomeGrid.serialize(inSun)), rows, emptySet(), portal = true)
+        assertTrue(HomeGrid.inSun(reloaded.find(HomeGrid.PORTAL)))
+        val hidden = HomeGrid.normalize(inSun, rows, emptySet(), portal = false)
+        val shownAgain = HomeGrid.normalize(HomeGrid.keepHidden(hidden, inSun), rows, emptySet(), portal = true)
+        assertTrue(HomeGrid.inSun(shownAgain.find(HomeGrid.PORTAL)))
+    }
 }

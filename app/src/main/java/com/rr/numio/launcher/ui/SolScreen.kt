@@ -44,6 +44,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.BiasAlignment
 import androidx.compose.ui.Modifier
+import com.rr.numio.launcher.data.SunSpot
+import kotlin.math.roundToInt
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.semantics.onLongClick
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -135,11 +138,18 @@ fun SolScreen(
     val hasWork by vm.hasWorkProfile.collectAsStateWithLifecycle()
     val swipe = with(LocalDensity.current) { 56.dp.toPx() }
     val now = rememberNow()
+    // Where the wallpaper's sun is on screen (window pixels), for placing the logo in it
+    var sun by remember { mutableStateOf<Offset?>(null) }
 
     Box(
         modifier
             .fillMaxSize()
             .background(colors.background)
+            .onGloballyPositioned { coords ->
+                val b = coords.boundsInWindow()
+                val (x, y) = SunSpot.onScreen(wallpaper, coords.size.width.toFloat(), coords.size.height.toFloat())
+                sun = Offset(b.left + x, b.top + y)
+            }
             .pointerInput(Unit) {
                 var dragged = 0f
                 detectVerticalDragGestures(
@@ -156,7 +166,7 @@ fun SolScreen(
             ),
             contentDescription = null,
             contentScale = ContentScale.Crop,
-            alignment = BiasAlignment(0f, 0.4f),
+            alignment = BiasAlignment(0f, SunSpot.BIAS_Y),
             modifier = Modifier.fillMaxSize(),
         )
         Column(
@@ -198,6 +208,7 @@ fun SolScreen(
                 onOpenClock = onOpenClock,
                 onOpenEvent = onOpenEvent,
                 onOpenCalendar = onOpenCalendar,
+                sun = sun,
                 portalTint = PortalRules.color(portal.color, HomeTheme.Sol),
                 portalDescription = portalDescription(PortalRules.tap(portal, hasWork)),
                 onTapPortal = vm::tapPortal,
@@ -262,6 +273,7 @@ private fun SolHomeGrid(
     onOpenClock: () -> Unit,
     onOpenEvent: (Long, Long) -> Unit,
     onOpenCalendar: () -> Unit,
+    sun: Offset?,
     portalTint: Long?,
     portalDescription: String,
     onTapPortal: () -> Unit,
@@ -277,19 +289,35 @@ private fun SolHomeGrid(
         val cellW = maxWidth / cols
         val cellH = maxHeight / rows
         var menuAt by remember { mutableStateOf<DpOffset?>(null) }
+        var origin by remember { mutableStateOf(Offset.Zero) }
+        val density = LocalDensity.current
+        val logoHalf = with(density) { 28.dp.toPx() }
+        // the sun relative to the grid, if it's inside the grid
+        val sunLocal = sun?.let { it - origin }?.takeIf {
+            it.x in 0f..with(density) { maxWidth.toPx() } && it.y in 0f..with(density) { maxHeight.toPx() }
+        }
+        val sunSlot = Slot(Slot.SUN, 0)
 
         Box(
             Modifier
                 .fillMaxSize()
-                // the grid reports every cell's place on screen, filled or not
+                // the grid reports every cell's place on screen, filled or not, and the sun's
                 .onGloballyPositioned { coords ->
                     val o = coords.boundsInWindow().topLeft
+                    origin = o
                     val cw = coords.size.width / cols.toFloat()
                     val ch = coords.size.height / rows.toFloat()
-                    placement.slots.keys.removeAll { it.area == Slot.HOME }
+                    placement.slots.keys.removeAll { it.area == Slot.HOME || it.area == Slot.SUN }
                     for (r in 0 until rows) for (c in 0 until cols) {
                         placement.slots[Slot(Slot.HOME, r * cols + c)] =
                             Rect(o.x + c * cw, o.y + r * ch, o.x + (c + 1) * cw, o.y + (r + 1) * ch)
+                    }
+                    val sw = sun
+                    if (sw != null) {
+                        val local = sw - o
+                        if (local.x in 0f..coords.size.width.toFloat() && local.y in 0f..coords.size.height.toFloat()) {
+                            placement.slots[sunSlot] = Rect(sw.x - logoHalf, sw.y - logoHalf, sw.x + logoHalf, sw.y + logoHalf)
+                        }
                     }
                 }
         ) {
@@ -313,6 +341,14 @@ private fun SolHomeGrid(
             // Where the dragged item would land (apps under an app show their own ring)
             val from = placement.dragging
             val to = placement.target
+            if (from != null && to == sunSlot && sunLocal != null) {
+                Box(
+                    Modifier
+                        .offset { IntOffset((sunLocal.x - logoHalf).roundToInt(), (sunLocal.y - logoHalf).roundToInt()) }
+                        .size(56.dp)
+                        .border(2.dp, colors.ink, CircleShape)
+                )
+            }
             if (from != null && to != null && to != from && to.area == Slot.HOME) {
                 val size = if (from.area == Slot.HOME) {
                     items.firstOrNull { it.col == from.index % cols && it.row == from.index / cols }?.let { it.w to it.h }
@@ -337,6 +373,19 @@ private fun SolHomeGrid(
 
             items.forEach { item ->
                 key(item.id) {
+                    if (HomeGrid.inSun(item)) {
+                        // The logo sitting in the wallpaper's sun
+                        if (sunLocal != null) {
+                            Box(
+                                Modifier
+                                    .offset { IntOffset((sunLocal.x - logoHalf).roundToInt(), (sunLocal.y - logoHalf).roundToInt()) }
+                                    .size(56.dp)
+                                    .zIndex(if (placement.dragging == sunSlot) 1f else 0f)
+                            ) {
+                                PortalWidget(sunSlot, placement, portalTint, portalDescription, onTapPortal, onPortalMenu)
+                            }
+                        }
+                    } else {
                     val slot = Slot(Slot.HOME, item.row * cols + item.col)
                     Box(
                         Modifier
@@ -370,6 +419,7 @@ private fun SolHomeGrid(
                                 onPickStyle = vm::setSolClock,
                             )
                         }
+                    }
                     }
                 }
             }

@@ -5,6 +5,8 @@ data class Slot(val area: Int, val index: Int) {
     companion object {
         const val HOME = 0
         const val DOCK = 1
+        /** The wallpaper's sun: a spot only the Numio logo can go. */
+        const val SUN = 2
     }
 }
 

@@ -26,6 +26,7 @@ Every icon is drawn in the Numio **Sketch** style (wobbly ink on warm paper, wit
 **The Numio logo and Workspace**
 - The official Numio mark sits on the home screen with nothing behind it (a widget you can move on Sol; top right on Ink)
 - Tap it to open what you've chosen: the Workspace (your work-profile apps), a screen of personal apps you pick, or nothing
+- On Sol, drag it into the wallpaper's sun and it snaps right into the middle (Charcoal or Olive reads best there)
 - Long-press it to customize: logo colour (with a preview), what a tap opens, and whether it's shown at all. Hidden, it keeps its place, colour and apps; "Numio logo…" in the home menu brings it back
 - If your phone has a work profile, its apps are kept out of the Shelf and its search and live in the Workspace, opened through Android as usual
 - When Android has work apps paused or the work profile locked, the Workspace says so; "Turn on work apps" only asks Android, which may ask you to unlock
