@@ -133,6 +133,24 @@ class SketchRolesTest {
         )
     }
 
+    @Test fun everyVisibleAssistantAppGetsInkOrbit() {
+        val shown = mapOf("com.anthropic.claude" to "Claude", "com.openai.chatgpt" to "ChatGPT")
+        val handlers = listOf(h("com.anthropic.claude", false), h("com.openai.chatgpt", false), h("com.hidden.assistant", true))
+        // all that declare it and are in the app list; a hidden one and the chooser never
+        assertEquals(
+            setOf("com.anthropic.claude", "com.openai.chatgpt"),
+            SketchRoles.choose(SketchKind.Assistant, listOf("android"), handlers, shown),
+        )
+        // nothing declared: nothing gets it (no guessing by name)
+        assertEquals(emptySet<String>(), SketchRoles.choose(SketchKind.Assistant, listOf(null), emptyList(), shown))
+    }
+
+    @Test fun anotherJobWinsOverBeingAnAssistant() {
+        val roles = mapOf(SketchKind.Browser to setOf("x.browser"), SketchKind.Assistant to setOf("x.browser", "x.ai"))
+        assertEquals(SketchKind.Browser, SketchRoles.kindFor("x.browser", "X", roles))
+        assertEquals(SketchKind.Assistant, SketchRoles.kindFor("x.ai", "X AI", roles))
+    }
+
     @Test fun everyJobHasAWayToBeFound() {
         val intents = SketchRoles.intents()
         for (k in SketchKind.entries.filter { it.main }) assertTrue("$k has no intent", intents[k].orEmpty().isNotEmpty())

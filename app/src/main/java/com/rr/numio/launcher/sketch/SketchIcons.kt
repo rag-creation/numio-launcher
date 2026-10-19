@@ -42,7 +42,12 @@ object SketchIcons {
     }
 
     // The hand-picked choice is part of the key, so picking another drawing draws it again
-    private fun cacheKey(entry: AppEntry, px: Int) = "${entry.key}@$px~${SketchChoices.current[entry.key].orEmpty()}"
+    private fun cacheKey(entry: AppEntry, px: Int) = keyFor(entry.key, px, SketchChoices.current[entry.key])
+
+    internal fun keyFor(appKey: String, px: Int, choice: String?) = "$appKey@$px~${choice.orEmpty()}"
+
+    /** The cached keys that belong to [packageName] (app keys start "package/"). */
+    internal fun keysOf(keys: Collection<String>, packageName: String) = keys.filter { it.startsWith("$packageName/") }
 
     fun cached(entry: AppEntry, px: Int): ImageBitmap? = cache.get(cacheKey(entry, px))
 
@@ -54,15 +59,14 @@ object SketchIcons {
     /** After an app update or removal, so its icon is drawn again. */
     fun evictPackage(packageName: String) {
         SketchRoles.reset()
-        val prefix = "$packageName/"
-        cache.snapshot().keys.filter { it.startsWith(prefix) }.forEach { cache.remove(it) }
+        keysOf(cache.snapshot().keys, packageName).forEach { cache.remove(it) }
     }
 
     private fun render(context: Context, entry: AppEntry, px: Int): Bitmap {
         val bmp = Bitmap.createBitmap(px, px, Bitmap.Config.ARGB_8888)
         val kind = SketchChoices.decide(SketchChoices.current[entry.key]) { automatic(context, entry) }
         paint(context, Canvas(bmp), px, entry.key.hashCode(), entry.label, kind, entry.isMainUser,
-            treat = SketchTreatment.applies(entry.packageName)) {
+            derived = { cx, r -> MonoLayer.derived(entry, px, cx, r, INK) }) {
             MonoLayer.of(entry)
         }
         return bmp
@@ -77,18 +81,22 @@ object SketchIcons {
         withContext(Dispatchers.Default) {
             val bmp = Bitmap.createBitmap(px, px, Bitmap.Config.ARGB_8888)
             paint(context, Canvas(bmp), px, entry.key.hashCode(), entry.label, kind, entry.isMainUser,
-                treat = SketchTreatment.applies(entry.packageName)) { MonoLayer.of(entry) }
+                derived = { cx, r -> MonoLayer.derived(entry, px, cx, r, INK) }) { MonoLayer.of(entry) }
             bmp.asImageBitmap()
         }
 
     /**
-     * One icon, [px] square, onto [c]: paper disc, then the [kind]'s sketch symbol, else the
-     * app's monochrome layer from [mono], else its first letter; then the ink ring and, for
-     * other profiles, the gold badge. Also used to draw the preview sheets.
+     * One icon, [px] square, onto [c]: paper disc, then the [kind]'s sketch symbol; else the
+     * app's own artwork, drawn by hand ([SketchTreatment]): its monochrome layer from [mono],
+     * or, without one, a shape taken from its normal icon by [derived] (the same extraction
+     * Sol uses; it gives up on icons it can't read cleanly); else its first letter. Then the
+     * ink ring and, for other profiles, the gold badge. Also used for the preview sheets.
      */
     fun paint(
         context: Context, c: Canvas, px: Int, seed: Int, label: String,
-        kind: SketchKind?, isMainUser: Boolean, treat: Boolean = false, mono: () -> Drawable?,
+        kind: SketchKind?, isMainUser: Boolean,
+        derived: ((cx: Float, r: Float) -> Bitmap?)? = null,
+        mono: () -> Drawable?,
     ) {
         val cx = px / 2f
         val r = px * 0.44f
@@ -99,9 +107,11 @@ object SketchIcons {
         c.drawPath(disc, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = PAPER })
 
         // The mark inside: a Numio Sketch symbol, else the app's own monochrome mark, else a letter
-        val flat = if (kind == null) mono()?.let { MonoLayer.inked(it, px, cx, r, INK) } else null
-        // the app's own artwork, drawn by hand (prototype apps only, see SketchTreatment)
-        val inked = if (flat != null && treat) SketchTreatment.apply(flat, INK, seed).also { flat.recycle() } else flat
+        val flat = if (kind == null) {
+            mono()?.let { MonoLayer.inked(it, px, cx, r, INK) } ?: derived?.invoke(cx, r)
+        } else null
+        // the app's own artwork, drawn by hand
+        val inked = flat?.let { SketchTreatment.apply(it, INK, seed).also { _ -> it.recycle() } }
         if (kind != null) {
             c.save()
             c.clipPath(disc)

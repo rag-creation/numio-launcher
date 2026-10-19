@@ -11,20 +11,16 @@ import kotlin.math.sin
  * The hand-drawn treatment for an app's own icon artwork (its monochrome layer, read from
  * the phone at runtime and never copied into Numio): its edges wobble gently like a pen
  * line, a lighter second pass thickens one side, and the whole mark sits at a slight
- * hand tilt. The app's silhouette stays exactly recognisable.
- *
- * Prototype: only the apps in [PROTOTYPE] get it for now, for review.
+ * hand tilt. Kept subtle so the app's silhouette and details stay recognisable.
+ * Every app's own artwork in Ink gets it; Sol never does.
  */
 object SketchTreatment {
 
-    val PROTOTYPE = setOf(
-        "org.telegram.messenger", "org.telegram.messenger.web",
-        "com.whatsapp", "com.whatsapp.w4b",
-        "com.facebook.katana", "com.instagram.android",
-        "com.reddit.frontpage", "com.google.android.youtube",
-    )
+    /** How far edges drift, as a share of the icon (about 1 px on a 52 dp icon). */
+    const val WOBBLE = 0.008
 
-    fun applies(packageName: String) = packageName in PROTOTYPE
+    /** The tilt for [seed]: -1, -0.5, 0, 0.5 or 1 degree, fixed per app. */
+    fun tilt(seed: Int): Float = (Math.floorMod(seed, 5) - 2) * 0.5f
 
     /** Edge wobble at [x], [y]: a smooth field, about 1.2% of the icon, same per [seed]. */
     private fun field(x: Float, y: Float, px: Int, seed: Int, axis: Int): Float {
@@ -32,7 +28,7 @@ object SketchTreatment {
         val u = x / px * 2 * PI
         val v = y / px * 2 * PI
         val w = 0.6 * sin(u * 1.7 + v * 0.9 + s) + 0.4 * sin(u * 4.3 - v * 3.1 + s * 1.9)
-        return (w * px * 0.012).toFloat()
+        return (w * px * WOBBLE).toFloat()
     }
 
     /** Bilinear alpha from [a] (px*px) at a fractional spot; 0 outside. */
@@ -69,11 +65,10 @@ object SketchTreatment {
         // 2. the second, lighter pass, a hair down-right, and 3. a slight tilt for the whole mark
         val out = Bitmap.createBitmap(px, px, Bitmap.Config.ARGB_8888)
         val c = Canvas(out)
-        val tilt = ((seed % 5) - 2) * 0.9f   // -1.8 .. 1.8 degrees, fixed per app
-        c.rotate(tilt, px / 2f, px / 2f)
+        c.rotate(tilt(seed), px / 2f, px / 2f)
         val paint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
-        paint.alpha = 140
-        c.drawBitmap(line, px * 0.006f, px * 0.005f, paint)
+        paint.alpha = 110
+        c.drawBitmap(line, px * 0.005f, px * 0.004f, paint)
         paint.alpha = 255
         c.drawBitmap(line, 0f, 0f, paint)
         line.recycle()

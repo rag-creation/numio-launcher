@@ -48,14 +48,43 @@ class SketchTreatmentTest {
         val either = a.indices.count { a[it] || b[it] }
         val changed = a.indices.count { a[it] != b[it] }
         val overlap = both.toFloat() / either
-        assertTrue("silhouette lost (overlap $overlap)", overlap > 0.7f)
+        assertTrue("silhouette lost (overlap $overlap)", overlap > 0.8f)
         assertTrue("nothing changed", changed > 20)
     }
 
-    @Test fun onlyThePrototypeAppsAreTreated() {
-        assertTrue(SketchTreatment.applies("org.telegram.messenger"))
-        assertTrue(SketchTreatment.applies("com.whatsapp"))
-        assertTrue(!SketchTreatment.applies("org.fossify.gallery"))
+    @Test fun theTiltStaysSmall() {
+        for (seed in listOf(Int.MIN_VALUE, -7, -1, 0, 1, 2, 3, 4, 99, Int.MAX_VALUE)) {
+            val t = SketchTreatment.tilt(seed)
+            assertTrue("tilt $t for $seed", t >= -1f && t <= 1f)
+        }
+    }
+
+    @Test fun ownArtworkThenExtractedShapeThenLetter() {
+        val px = 137
+        fun draw(mono: Boolean, derived: Bitmap?): Bitmap {
+            val b = Bitmap.createBitmap(px, px, Bitmap.Config.ARGB_8888)
+            SketchIcons.paint(context, Canvas(b), px, 7, "Zebra", null, true, derived = { _, _ -> derived }) {
+                if (mono) ContextCompat.getDrawable(context, R.drawable.numio_mark_n) else null
+            }
+            return b
+        }
+        val letter = inked(draw(mono = false, derived = null))
+        val extracted = inked(draw(mono = false, derived = flatMark()))
+        val own = inked(draw(mono = true, derived = flatMark()))
+        // something readable is always drawn
+        assertTrue(letter.count { it } > 200)
+        // an extracted shape replaces the letter, and the app's own layer comes before it
+        assertTrue(letter.indices.count { letter[it] != extracted[it] } > 100)
+        assertTrue(own.indices.count { own[it] != extracted[it] } > 100)
+    }
+
+    @Test fun cacheKeysFollowTheChoiceAndThePackage() {
+        val a = SketchIcons.keyFor("com.whatsapp/.Main#0", 137, null)
+        assertTrue(a != SketchIcons.keyFor("com.whatsapp/.Main#0", 137, "Assistant"))
+        assertTrue(a != SketchIcons.keyFor("com.whatsapp/.Main#0", 131, null))
+        val keys = listOf(a, SketchIcons.keyFor("com.whatsapp.w4b/.Main#0", 137, null), SketchIcons.keyFor("org.fossify.gallery/.Main#0", 137, null))
+        // an update to WhatsApp clears only WhatsApp's icons, not WhatsApp Business's
+        assertTrue(SketchIcons.keysOf(keys, "com.whatsapp") == listOf(a))
     }
 
     @Test fun saveBeforeAfterSheet() {

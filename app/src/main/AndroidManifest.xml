@@ -34,6 +34,12 @@
         </intent>
         <!-- Ink's sketch symbols: which preinstalled apps are the camera, settings, calendar… -->
         <intent>
+            <action android:name="android.intent.action.ASSIST" />
+        </intent>
+        <intent>
+            <action android:name="android.service.voice.VoiceInteractionService" />
+        </intent>
+        <intent>
             <action android:name="android.media.action.STILL_IMAGE_CAMERA" />
         </intent>
         <intent>

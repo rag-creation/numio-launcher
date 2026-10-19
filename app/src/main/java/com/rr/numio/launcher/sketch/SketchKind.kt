@@ -29,6 +29,9 @@ enum class SketchKind(
     val titles: List<String> = emptyList(),
     /** False for a variant drawing (a second clock, say): picked by hand, never automatic. */
     val main: Boolean = true,
+    /** A capability many apps share (being an assistant): every app that declares it gets
+     *  the drawing, instead of one app per job. */
+    val everyApp: Boolean = false,
 ) {
     Phone("Phone", listOf("phone", "dial", "call"), listOf("phone")),
     Messages("Messages", listOf("message", "sms", "chat"), listOf("messages", "messaging")),
@@ -49,8 +52,9 @@ enum class SketchKind(
     Maps("Maps", listOf("map"), listOf("maps")),
     Calculator("Calculator", listOf("calculator", "calc"), listOf("calculator")),
     Recorder("Recorder", listOf("recorder", "recording"), listOf("voice recorder", "recorder", "sound recorder")),
-    /** Ink Orbit: Numio's own mark for AI assistant apps. Picked by hand only. */
-    Assistant("Assistant", emptyList(), main = false),
+    /** Ink Orbit: Numio's own mark for assistant apps, the ones Android lets you choose as
+     *  the phone's digital assistant (see [SketchRoles.detect]). */
+    Assistant("Assistant", emptyList(), everyApp = true),
 }
 
 /** Colours a glyph may use. Charcoal ink, warm cream and a little gold, nothing else. */
@@ -130,7 +134,14 @@ object SketchRoles {
         ),
         SketchKind.Calculator to listOf(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_APP_CALCULATOR)),
         SketchKind.Recorder to listOf(Intent(MediaStore.Audio.Media.RECORD_SOUND_ACTION)),
+        // Apps that qualify for Android's assistant role: an activity for the assist action
+        // (the voice-service kind is looked up separately, in detect)
+        SketchKind.Assistant to listOf(Intent(Intent.ACTION_ASSIST)),
     )
+
+    /** The voice interaction service an assistant app may offer instead of an assist activity. */
+    const val VOICE_SERVICE = "android.service.voice.VoiceInteractionService"
+    const val BIND_VOICE = "android.permission.BIND_VOICE_INTERACTION"
 
     /** Intent.CATEGORY_APP_FILES (Android 10), spelled out for older phones. */
     private const val CATEGORY_APP_FILES = "android.intent.category.APP_FILES"
@@ -157,6 +168,8 @@ object SketchRoles {
         shown: Map<String, String>?,
     ): Set<String> {
         fun visible(p: String) = p != "android" && p.isNotEmpty() && (shown == null || p in shown)
+        // a shared capability: every visible app that declares it
+        if (kind.everyApp) return (handlers.map { it.packageName } + defaults.filterNotNull()).filter(::visible).toSet()
         val chosen = defaults.filterNotNull().filter(::visible).toSet()
         if (chosen.isNotEmpty()) return chosen
         val real = handlers.filter { visible(it.packageName) }
@@ -169,6 +182,15 @@ object SketchRoles {
         val preinstalled = real.filter { it.preinstalled }.map { it.packageName }.toSet()
         if (preinstalled.isNotEmpty()) return preinstalled
         return if (all.size == 1) all else emptySet()
+    }
+
+    /** Apps with a voice interaction service guarded the way Android's assistant role requires. */
+    private fun voiceAssistants(pm: PackageManager): List<Handler> = try {
+        pm.queryIntentServices(Intent(VOICE_SERVICE), 0)
+            .filter { it.serviceInfo.permission == BIND_VOICE }
+            .map { Handler(it.serviceInfo.packageName, it.serviceInfo.applicationInfo.flags and ApplicationInfo.FLAG_SYSTEM != 0) }
+    } catch (e: Exception) {
+        emptyList()
     }
 
     /** Packages with an icon in the app list (this profile), with their names. Null if unknown. */
@@ -201,7 +223,7 @@ object SketchRoles {
                 } catch (e: Exception) {
                     emptyList()
                 }
-            }
+            } + if (kind == SketchKind.Assistant) voiceAssistants(pm) else emptyList()
             choose(kind, defaults, handlers, shown)
         }
     }
