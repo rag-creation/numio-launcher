@@ -20,12 +20,16 @@ object HomeGrid {
     const val CLOCK = "w:clock"
     const val TODAY = "w:today"
     const val MONTH = "w:month"
+    /** The Workspace portal (official Numio mark); only shown when there's a work profile. */
+    const val PORTAL = "w:portal"
 
     /** Widgets, their sizes and where they start on a fresh layout. */
     private val widgets = listOf(
         GridItem(CLOCK, 0, 0, 5, 2),
         GridItem(TODAY, 0, 2, 4, 1),
         GridItem(MONTH, 0, 3, 3, 3),
+        // beside the alarm chip, in the column the chip leaves free
+        GridItem(PORTAL, 4, 2, 1, 1),
     )
 
     fun isWidget(id: String) = id.startsWith("w:")
@@ -55,7 +59,7 @@ object HomeGrid {
      * keep their columns on the bottom two rows, so nothing jumps on the first update.
      */
     fun fromLegacy(homeCells: List<String?>, rows: Int): List<GridItem> =
-        widgets + homeCells.mapIndexedNotNull { i, key ->
+        widgets.filter { it.id != PORTAL } + homeCells.mapIndexedNotNull { i, key ->
             key?.let { GridItem(it, i % COLS, rows - 2 + i / COLS, 1, 1) }
         }
 
@@ -66,13 +70,14 @@ object HomeGrid {
 
     /**
      * Makes any saved layout valid for this many [rows]: every widget present, nothing out
-     * of bounds, nothing overlapping, no app twice, only [installed] apps. Anything that
+     * of bounds, nothing overlapping, no app twice, only [installed] apps, and the Workspace
+     * portal only when [portal] is true (there's a work profile). Anything that
      * doesn't fit where it was goes to the first free spot; if there is none, it's left out.
      */
-    fun normalize(saved: List<GridItem>, rows: Int, installed: Set<String>): List<GridItem> {
+    fun normalize(saved: List<GridItem>, rows: Int, installed: Set<String>, portal: Boolean = false): List<GridItem> {
         val placed = ArrayList<GridItem>()
         val seen = HashSet<String>()
-        val wanted = widgets.map { w -> saved.firstOrNull { it.id == w.id } ?: w } +
+        val wanted = widgets.filter { portal || it.id != PORTAL }.map { w -> saved.firstOrNull { it.id == w.id } ?: w } +
             saved.filter { !it.isWidget && it.id in installed }
         for (item in wanted) {
             if (!seen.add(item.id)) continue

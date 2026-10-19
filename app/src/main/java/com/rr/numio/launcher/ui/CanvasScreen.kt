@@ -99,6 +99,7 @@ fun CanvasScreen(
     val isDefault by vm.isDefaultHome.collectAsStateWithLifecycle()
     val bg by vm.background.collectAsStateWithLifecycle()
     val showCalendar by vm.showCalendar.collectAsStateWithLifecycle()
+    val hasWork by vm.hasWorkProfile.collectAsStateWithLifecycle()
     val swipe = with(LocalDensity.current) { 56.dp.toPx() }
     val now = rememberNow()
 
@@ -151,6 +152,19 @@ fun CanvasScreen(
             Spacer(Modifier.height(20.dp))
             SearchPill(colors) { vm.openShelf(ShelfMode.Search) }
             Spacer(Modifier.height(16.dp))
+        }
+
+        // Ink: the Workspace portal sits at a fixed spot, top right, level with the open sky
+        // above the clock (Ink has no grid to place it on). Only when there's a work profile.
+        if (hasWork) {
+            WorkspacePortal(
+                colors,
+                Modifier
+                    .align(Alignment.TopEnd)
+                    .statusBarsPadding()
+                    .padding(top = 20.dp, end = 20.dp),
+                onOpen = vm::openWorkspace,
+            )
         }
     }
 }

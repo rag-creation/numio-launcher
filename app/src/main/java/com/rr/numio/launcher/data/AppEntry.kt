@@ -16,8 +16,11 @@ class AppEntry(
     val info: LauncherActivityInfo,
     /** "Work", "Secure Folder"… for apps outside the main profile, else null. */
     val profileLabel: String? = null,
+    /** Which profile this is. Work-profile apps live behind the Workspace portal. */
+    val profileKind: ProfileKind = if (isMainUser) ProfileKind.Personal else ProfileKind.Work,
     /** Maker line ("Samsung", "Fossify") shown only when another app has the same name. */
     val clashLabel: String? = null,
 ) {
     val packageName: String get() = component.packageName
+    val isWork: Boolean get() = profileKind == ProfileKind.Work
 }

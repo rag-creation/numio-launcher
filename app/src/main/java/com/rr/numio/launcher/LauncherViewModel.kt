@@ -11,6 +11,8 @@ import com.rr.numio.launcher.data.Cells
 import com.rr.numio.launcher.data.DefaultDock
 import com.rr.numio.launcher.data.GridItem
 import com.rr.numio.launcher.data.HomeGrid
+import com.rr.numio.launcher.data.Profiles
+import com.rr.numio.launcher.data.WorkState
 import com.rr.numio.launcher.data.Slot
 import com.rr.numio.launcher.data.HomePrefs
 import com.rr.numio.launcher.data.HomeTheme
@@ -112,12 +114,60 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
         repo.apps.filterNotNull().map { list -> list.associateBy { it.key } }
             .stateIn(viewModelScope, SharingStarted.Eagerly, emptyMap())
 
+    // ── Workspace (work-profile apps, behind the Numio portal) ─────────────────
+
+    /** The work profile as Android reports it; null when there's none. */
+    val workProfile: StateFlow<AppRepository.WorkProfile?> = repo.work
+
+    /** Show the portal only when the phone has a work profile. */
+    val hasWorkProfile: StateFlow<Boolean> =
+        repo.work.map { it != null }.stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
+    /** Only the work-profile apps, A–Z. */
+    val workApps: StateFlow<List<AppEntry>> =
+        repo.apps.filterNotNull().map { Profiles.workspace(it) { a -> a.isWork } }
+            .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
+    val workState: StateFlow<WorkState> =
+        combine(repo.work, workApps) { w, apps ->
+            Profiles.workState(
+                hasProfile = w != null,
+                listed = w?.listed ?: false,
+                paused = w?.paused ?: false,
+                unlocked = w?.unlocked ?: true,
+                apps = apps.size,
+            )
+        }.stateIn(viewModelScope, SharingStarted.Eagerly, WorkState.NoProfile)
+
+    private val _workspaceOpen = MutableStateFlow(false)
+    val workspaceOpen: StateFlow<Boolean> = _workspaceOpen.asStateFlow()
+
+    fun openWorkspace() {
+        closeShelf()
+        _workspaceOpen.value = true
+    }
+
+    fun closeWorkspace() {
+        _workspaceOpen.value = false
+    }
+
+    /** "Turn on work apps": a request to Android, which may ask to unlock. Never done silently. */
+    fun turnOnWorkApps() {
+        if (!repo.requestWorkOn()) {
+            Toast.makeText(
+                getApplication(),
+                "Android didn't allow it from here. Use the work apps switch in Settings or quick settings",
+                Toast.LENGTH_LONG,
+            ).show()
+        }
+    }
+
     /** Sol's home grid, always valid for the current screen (see [HomeGrid.normalize]). */
     val gridItems: StateFlow<List<GridItem>> =
-        combine(appsByKey, prefs.solGrid, prefs.homeApps, gridRows) { apps, saved, legacy, rows ->
+        combine(appsByKey, prefs.solGrid, prefs.homeApps, gridRows, hasWorkProfile) { apps, saved, legacy, rows, work ->
             val items = if (saved != null) HomeGrid.parse(saved)
             else HomeGrid.fromLegacy(Cells.pad(legacy, HomePrefs.HOME_MAX), rows)
-            HomeGrid.normalize(items, rows, apps.keys)
+            HomeGrid.normalize(items, rows, apps.keys, portal = work)
         }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     private fun keys(cells: List<AppEntry?>) = cells.map { it?.key }
@@ -159,12 +209,15 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
         val rows = gridRows.value
         val first = HomeGrid.fromLegacy(apps.take(HomePrefs.HOME_MAX), rows)
         val rest = apps.drop(HomePrefs.HOME_MAX).map { GridItem(it, -1, -1, 1, 1) }
-        saveGrid(HomeGrid.normalize(first + rest, rows, appsByKey.value.keys))
+        saveGrid(HomeGrid.normalize(first + rest, rows, appsByKey.value.keys, portal = hasWorkProfile.value))
     }
 
     /** Search results; with no query, every app A–Z. */
     val results: StateFlow<List<AppEntry>> =
-        combine(repo.apps.filterNotNull(), _query) { apps, q -> AppSearch.rank(q, apps) { it.label } }
+        // The normal drawer and its search never include work-profile apps (they're in the Workspace)
+        combine(repo.apps.filterNotNull(), _query) { apps, q ->
+            AppSearch.rank(q, Profiles.drawer(apps) { it.isWork }) { it.label }
+        }
             .flowOn(Dispatchers.Default)
             .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
@@ -193,7 +246,10 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /** Home button: always back to a clean Canvas. */
-    fun goHome() = closeShelf()
+    fun goHome() {
+        closeShelf()
+        closeWorkspace()
+    }
 
     fun setQuery(q: String) {
         _query.value = q

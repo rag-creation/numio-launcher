@@ -45,6 +45,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.BiasAlignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.onLongClick
+import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.geometry.Rect
@@ -349,6 +350,7 @@ private fun SolHomeGrid(
                                 onOpenEvent = onOpenEvent,
                                 onOpenCalendar = onOpenCalendar,
                                 onPickStyle = vm::setSolClock,
+                                onOpenWorkspace = vm::openWorkspace,
                             )
                         }
                     }
@@ -395,23 +397,30 @@ private fun GridWidget(
     onOpenEvent: (Long, Long) -> Unit,
     onOpenCalendar: () -> Unit,
     onPickStyle: (SolClock) -> Unit,
+    onOpenWorkspace: () -> Unit,
 ) {
     val haptics = LocalHapticFeedback.current
     var picker by remember { mutableStateOf(false) }
     val onTap: () -> Unit = when (id) {
         HomeGrid.CLOCK -> onOpenClock
         HomeGrid.MONTH -> onOpenCalendar
+        HomeGrid.PORTAL -> onOpenWorkspace
         else -> ({})
     }
     val label = when (id) {
         HomeGrid.CLOCK -> "Clock"
         HomeGrid.MONTH -> "Calendar"
+        HomeGrid.PORTAL -> "Workspace"
         else -> "Next alarm"
     }
     Box(
         Modifier
             .fillMaxSize()
             .semantics {
+                if (id == HomeGrid.PORTAL) {
+                    contentDescription = PORTAL_DESCRIPTION
+                    onClick(label = PORTAL_DESCRIPTION) { onOpenWorkspace(); true }
+                }
                 onLongClick(label = if (id == HomeGrid.CLOCK) "Change clock style" else "Move $label") {
                     if (id == HomeGrid.CLOCK) picker = true
                     true
@@ -429,12 +438,17 @@ private fun GridWidget(
                     Modifier.border(1.dp, colors.inkSoft.copy(alpha = 0.3f), RoundedCornerShape(20.dp))
                 } else Modifier
             ),
-        contentAlignment = if (id == HomeGrid.TODAY) Alignment.CenterStart else Alignment.TopStart,
+        contentAlignment = when (id) {
+            HomeGrid.TODAY -> Alignment.CenterStart
+            HomeGrid.PORTAL -> Alignment.Center
+            else -> Alignment.TopStart
+        },
     ) {
         when (id) {
             HomeGrid.CLOCK -> SolClockView(colors, now, clockStyle, picker, { picker = false }, onPickStyle)
             HomeGrid.TODAY -> SolToday(colors, now, showCalendar, onOpenClock, onOpenEvent)
             HomeGrid.MONTH -> MonthCard(now, showCalendar, onOpenCalendar, Modifier.fillMaxWidth().padding(end = 8.dp))
+            HomeGrid.PORTAL -> WorkspacePortal(colors)
         }
     }
 }

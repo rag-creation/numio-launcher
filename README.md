@@ -23,12 +23,18 @@ Every icon is drawn in the Numio **Sketch** style (wobbly ink on warm paper, wit
 - Hold anything on Sol's home and drag it into free space; apps swap with apps and move to and from the dock. Hold the clock without moving to pick its style; long-press an empty spot for wallpaper, theme and "Reset home layout"
 - Switch from the long-press menu on the home screen. Your dock and apps stay exactly as they are
 
+**Workspace: your work-profile apps**
+- If your phone has a work profile, its apps are kept out of the Shelf and its search, and live behind the Numio mark on the home screen (a widget you can move on Sol; top right on Ink)
+- Tap it for the Workspace: only your work apps, opened through Android as usual
+- When Android has work apps paused or the work profile locked, the Workspace says so; "Turn on work apps" only asks Android, which may ask you to unlock
+- This only changes what Numio shows. The apps aren't hidden from Android, Settings or other launchers, and the work profile itself isn't changed
+
 **Shelf: all your apps**
 - Swipe up anywhere to see every app A–Z, with hand-drawn letter headings
 - Search bar at the bottom, near your thumb. Tap the search pill on the home screen and start typing; Enter opens the top result
 - Finds apps by the start of the name, any word ("maps"), initials ("yt") or letters in order
 - Long-press an app: add to dock, app info, uninstall
-- Apps from a second profile (Work, Secure Folder, Dual apps…) have a gold badge and their own section at the end
+- Apps from other profiles (Secure Folder, Dual apps, private space) have a gold badge and their own section at the end
 - Apps that share a name get a small second line saying who made them ("Calendar / Samsung", "Calendar / Fossify")
 - Pull down or press Back to close
 

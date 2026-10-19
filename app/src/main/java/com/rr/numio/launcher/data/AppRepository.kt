@@ -2,6 +2,9 @@ package com.rr.numio.launcher.data
 
 import android.content.ActivityNotFoundException
 import android.content.Context
+import androidx.core.content.ContextCompat
+import android.content.IntentFilter
+import android.content.BroadcastReceiver
 import android.content.Intent
 import android.content.pm.LauncherApps
 import android.graphics.Rect
@@ -37,6 +40,20 @@ class AppRepository(context: Context, private val scope: CoroutineScope) {
     private val userManager = appContext.getSystemService(UserManager::class.java)
     private val ownPackage = appContext.packageName
 
+    /** The work profile as Android reports it (null when there is none). */
+    data class WorkProfile(
+        val user: UserHandle,
+        /** False when Android wouldn't give its app list. */
+        val listed: Boolean,
+        /** "Pause work apps" is on. */
+        val paused: Boolean,
+        /** Unlocked (a work profile with its own lock can be locked while the phone isn't). */
+        val unlocked: Boolean,
+    )
+
+    private val _work = MutableStateFlow<WorkProfile?>(null)
+    val work: StateFlow<WorkProfile?> = _work
+
     private val _apps = MutableStateFlow<List<AppEntry>?>(null)
     /** null until the first load finishes. Sorted A–Z by label. */
     val apps: StateFlow<List<AppEntry>?> = _apps
@@ -54,10 +71,23 @@ class AppRepository(context: Context, private val scope: CoroutineScope) {
             packageNames.forEach { changed(it) }
     }
 
+    /** Android tells launchers when a work profile is added, removed, paused, resumed or unlocked. */
+    private val profileReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) = reload()
+    }
+
     fun start() {
         if (started) return
         started = true
         launcherApps.registerCallback(callback, Handler(Looper.getMainLooper()))
+        val filter = IntentFilter().apply {
+            addAction(Intent.ACTION_MANAGED_PROFILE_ADDED)
+            addAction(Intent.ACTION_MANAGED_PROFILE_REMOVED)
+            addAction(Intent.ACTION_MANAGED_PROFILE_AVAILABLE)
+            addAction(Intent.ACTION_MANAGED_PROFILE_UNAVAILABLE)
+            addAction(Intent.ACTION_MANAGED_PROFILE_UNLOCKED)
+        }
+        ContextCompat.registerReceiver(appContext, profileReceiver, filter, ContextCompat.RECEIVER_NOT_EXPORTED)
         reload()
     }
 
@@ -65,6 +95,26 @@ class AppRepository(context: Context, private val scope: CoroutineScope) {
         if (!started) return
         started = false
         launcherApps.unregisterCallback(callback)
+        try {
+            appContext.unregisterReceiver(profileReceiver)
+        } catch (e: IllegalArgumentException) {
+            // wasn't registered
+        }
+    }
+
+    /**
+     * Asks Android to turn work apps back on. Android may show its own unlock screen; if this
+     * launcher isn't allowed to ask (not the default home app), it says so and nothing changes.
+     */
+    fun requestWorkOn(): Boolean {
+        val user = _work.value?.user ?: return false
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.P) return false
+        return try {
+            userManager.requestQuietModeEnabled(false, user)
+            true
+        } catch (e: SecurityException) {
+            false
+        }
     }
 
     private fun changed(packageName: String) {
@@ -75,28 +125,43 @@ class AppRepository(context: Context, private val scope: CoroutineScope) {
 
     fun reload() {
         loadJob?.cancel()
-        loadJob = scope.launch(Dispatchers.IO) { _apps.value = load() }
+        loadJob = scope.launch(Dispatchers.IO) {
+            val (apps, work) = load()
+            _work.value = work
+            _apps.value = apps
+        }
     }
 
-    private fun load(): List<AppEntry> {
+    private fun load(): Pair<List<AppEntry>, WorkProfile?> {
         val me = Process.myUserHandle()
         val out = ArrayList<AppEntry>()
         val usedProfileLabels = HashSet<String>()
+        var work: WorkProfile? = null
         for (user in launcherApps.profiles) {
             val isMain = user == me
+            val kind = Profiles.kind(isMain, userType(user))
             // Two profiles of the same kind get "Work", "Work 2"
-            val profileName = if (isMain) null else profileLabel(user).let { base ->
+            val profileName = kind.label?.let { base ->
                 var label = base
                 var n = 2
                 while (!usedProfileLabels.add(label)) label = "$base ${n++}"
                 label
             }
-            // A locked work profile or private space can throw; just skip it
+            // A locked or paused profile can throw; then there's nothing to list
             val list = try {
                 launcherApps.getActivityList(null, user)
             } catch (e: Exception) {
-                continue
+                null
             }
+            if (kind == ProfileKind.Work && work == null) {
+                work = WorkProfile(
+                    user = user,
+                    listed = list != null,
+                    paused = try { userManager.isQuietModeEnabled(user) } catch (e: Exception) { false },
+                    unlocked = try { userManager.isUserUnlocked(user) } catch (e: Exception) { true },
+                )
+            }
+            if (list == null) continue
             val serial = userManager.getSerialNumberForUser(user)
             for (info in list) {
                 val cn = info.componentName
@@ -110,6 +175,7 @@ class AppRepository(context: Context, private val scope: CoroutineScope) {
                     isMainUser = isMain,
                     info = info,
                     profileLabel = profileName,
+                    profileKind = kind,
                 )
             }
         }
@@ -125,28 +191,21 @@ class AppRepository(context: Context, private val scope: CoroutineScope) {
             )
             idx.forEachIndexed { k, i -> withLabels[i] = labels[k] }
         }
-        return unique.mapIndexed { i, e ->
+        val apps = unique.mapIndexed { i, e ->
             if (withLabels[i] == null) e
-            else AppEntry(e.key, e.label, e.component, e.user, e.isMainUser, e.info, e.profileLabel, withLabels[i])
+            else AppEntry(e.key, e.label, e.component, e.user, e.isMainUser, e.info, e.profileLabel, e.profileKind, withLabels[i])
         }
+        return apps to work
     }
 
-    /** What kind of second profile this is, in words the user knows. */
-    private fun profileLabel(user: UserHandle): String {
-        if (Build.VERSION.SDK_INT >= 35) {
-            val type = try {
-                launcherApps.getLauncherUserInfo(user)?.userType
-            } catch (e: Exception) {
-                null
-            }.orEmpty().lowercase()
-            when {
-                type.endsWith(".managed") -> return "Work"
-                type.endsWith(".private") -> return "Private"
-                type.endsWith(".clone") || "dual" in type -> return "Dual apps"
-                "knox" in type || "secure" in type -> return "Secure Folder"
-            }
+    /** Android's user type for a profile (Android 15+), else null. */
+    private fun userType(user: UserHandle): String? {
+        if (Build.VERSION.SDK_INT < 35) return null
+        return try {
+            launcherApps.getLauncherUserInfo(user)?.userType
+        } catch (e: Exception) {
+            null
         }
-        return "Second profile"
     }
 
     fun launch(entry: AppEntry, bounds: Rect?, options: Bundle?) {

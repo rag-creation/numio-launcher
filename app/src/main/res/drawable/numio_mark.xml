@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The official Numio "N." mark, converted 1:1 from art/numio-mark.svg (the getnumio.org
+     favicon): same 1000-unit canvas, same points, same colour. NumioMarkTest checks they match. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp"
+    android:height="48dp"
+    android:viewportWidth="1000"
+    android:viewportHeight="1000">
+    <path
+        android:fillColor="#FFC21A"
+        android:pathData="M151.7,190.0 L428.4,404.2 L300.7,507.0 L300.7,810.0 L151.7,810.0 Z" />
+    <path
+        android:fillColor="#FFC21A"
+        android:pathData="M712.1,810.0 L435.4,595.8 L563.1,493.0 L563.1,190.0 L712.1,190.0 Z" />
+    <path
+        android:fillColor="#FFC21A"
+        android:pathData="M763.1,767.4 A42.6,42.6 0 1,0 848.3,767.4 A42.6,42.6 0 1,0 763.1,767.4 Z" />
+</vector>

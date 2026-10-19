@@ -107,4 +107,37 @@ class HomeGridTest {
     @Test fun firstFreeSkipsWidgets() {
         assertEquals(4 to 2, HomeGrid.firstFree(base(), rows))
     }
+
+    // ── the Workspace portal ────────────────────────────────────────────────
+
+    private fun withPortal(vararg apps: GridItem) =
+        HomeGrid.normalize(HomeGrid.fromLegacy(emptyList(), rows) + apps, rows, apps.map { it.id }.toSet(), portal = true)
+
+    @Test fun portalOnlyWhenThereIsAWorkProfile() {
+        assertTrue(base().none { it.id == HomeGrid.PORTAL })
+        assertEquals(GridItem(HomeGrid.PORTAL, 4, 2, 1, 1), withPortal().find(HomeGrid.PORTAL))
+    }
+
+    @Test fun portalTakesAFreeSpotWhenItsDefaultIsTaken() {
+        val g = withPortal(app("a", 4, 2))
+        assertEquals(app("a", 4, 2), g.find("a"))
+        val p = g.find(HomeGrid.PORTAL)
+        assertTrue(g.none { it !== p && it.overlaps(p) })
+    }
+
+    @Test fun portalMovesLikeAWidgetAndStaysOutOfTheDock() {
+        val g = withPortal(app("a", 0, 7))
+        val (moved, _) = HomeGrid.move(g, emptyList(), rows, cell(4, 2), cell(3, 7))!!
+        assertEquals(GridItem(HomeGrid.PORTAL, 3, 7, 1, 1), moved.find(HomeGrid.PORTAL))
+        assertNull(HomeGrid.move(g, listOf(null), rows, cell(4, 2), dock(0)))
+        // apps can't be dropped on it
+        assertNull(HomeGrid.move(g, emptyList(), rows, cell(0, 7), cell(4, 2)))
+    }
+
+    @Test fun portalPositionIsSaved() {
+        val g = withPortal()
+        val (moved, _) = HomeGrid.move(g, emptyList(), rows, cell(4, 2), cell(1, 6))!!
+        val reloaded = HomeGrid.normalize(HomeGrid.parse(HomeGrid.serialize(moved)), rows, emptySet(), portal = true)
+        assertEquals(GridItem(HomeGrid.PORTAL, 1, 6, 1, 1), reloaded.find(HomeGrid.PORTAL))
+    }
 }
