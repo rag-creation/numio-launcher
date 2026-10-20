@@ -96,19 +96,18 @@ class MainActivity : ComponentActivity() {
         val appearance by vm.inkAppearance.collectAsStateWithLifecycle()
         val warm by vm.inkWarmPaper.collectAsStateWithLifecycle()
         val sol = theme == HomeTheme.Sol
-        // Ink: Light Ink, Dark Ink, or following Android's dark theme (the default)
-        val inkDark = when (appearance) {
-            InkAppearance.System -> systemDark
-            InkAppearance.Light -> false
-            InkAppearance.Dark -> true
-        }
+        // Ink: Light Ink (default, even with the phone in dark mode), Dark Ink, or following the system
+        val inkDark = appearance.isDark(systemDark)
         // Sol is always light, to sit on its cream wallpaper
         val home = if (sol) SolColors else homeColors(bg, inkDark, warm)
         val paper = if (sol) SolColors else paperColors(inkDark, warm)
 
-        // Dark status bar icons on light paper; light ones on Dark Ink and over the wallpaper
-        val shelfOpen = shelf != ShelfMode.Closed
-        val lightBars = sol || (!inkDark && (shelfOpen || bg == Background.Paper))
+        // Dark status bar icons on light paper; light ones on Dark Ink and over the wallpaper.
+        // The Shelf, Workspace and Selected apps are always paper, whatever the home background.
+        val workspaceOpen by vm.workspaceOpen.collectAsStateWithLifecycle()
+        val selectedOpen by vm.selectedOpen.collectAsStateWithLifecycle()
+        val onPaper = shelf != ShelfMode.Closed || workspaceOpen || selectedOpen || bg == Background.Paper
+        val lightBars = sol || (!inkDark && onPaper)
         SideEffect {
             WindowCompat.getInsetsController(window, window.decorView).run {
                 isAppearanceLightStatusBars = lightBars

@@ -19,14 +19,25 @@ enum class HomeTheme { Ink, Sol }
 /** Sol's two wallpapers: Garden (painted, the default) and Petal (cut paper). */
 enum class SolWallpaper { Garden, Petal }
 
-/** How Ink looks: follow Android's dark theme (default), or always light or dark. */
+/**
+ * How Ink looks: Light Ink (the default, whatever the phone's own theme), Dark Ink, or
+ * following Android's dark theme. Independent of Samsung/Android dark mode unless chosen.
+ */
 enum class InkAppearance(val id: String, val label: String) {
-    System("system", "Follow system"),
     Light("light", "Light"),
-    Dark("dark", "Dark");
+    Dark("dark", "Dark"),
+    System("system", "Follow system");
+
+    /** Whether Ink shows its dark page, given the phone's own dark mode. */
+    fun isDark(systemDark: Boolean): Boolean = when (this) {
+        Light -> false
+        Dark -> true
+        System -> systemDark
+    }
 
     companion object {
-        fun of(id: String?) = entries.firstOrNull { it.id == id } ?: System
+        val DEFAULT = Light
+        fun of(id: String?) = entries.firstOrNull { it.id == id } ?: DEFAULT
     }
 }
 
@@ -94,7 +105,7 @@ class HomePrefs(context: Context) {
         }
     }
 
-    /** Ink: Light, Dark or Follow system (default). */
+    /** Ink: Light (default), Dark or Follow system. */
     val inkAppearance: Flow<InkAppearance> = store.data.map { p -> InkAppearance.of(p[INK_APPEARANCE]) }
 
     suspend fun setInkAppearance(a: InkAppearance) {

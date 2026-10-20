@@ -319,7 +319,7 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Ink: Light, Dark or Follow system, and Light Ink's paper. */
     val inkAppearance: StateFlow<com.rr.numio.launcher.data.InkAppearance> =
-        prefs.inkAppearance.stateIn(viewModelScope, SharingStarted.Eagerly, com.rr.numio.launcher.data.InkAppearance.System)
+        prefs.inkAppearance.stateIn(viewModelScope, SharingStarted.Eagerly, com.rr.numio.launcher.data.InkAppearance.DEFAULT)
     val inkWarmPaper: StateFlow<Boolean> = prefs.inkWarmPaper.stateIn(viewModelScope, SharingStarted.Eagerly, true)
 
     fun setInkAppearance(a: com.rr.numio.launcher.data.InkAppearance) {

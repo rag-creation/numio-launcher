@@ -24,9 +24,9 @@ class InkQuoteTest {
         assertEquals(InkQuote.MAX_LENGTH, prefs.inkQuote.first().text.length)
     }
 
-    @Test fun appearanceFollowsSystemByDefaultAndIsSaved() = runBlocking {
+    @Test fun appearanceIsLightByDefaultAndIsSaved() = runBlocking {
         val prefs = HomePrefs(ApplicationProvider.getApplicationContext())
-        assertEquals(InkAppearance.System, prefs.inkAppearance.first())
+        assertEquals(InkAppearance.Light, prefs.inkAppearance.first())
         assertTrue(prefs.inkWarmPaper.first())
         prefs.setInkAppearance(InkAppearance.Dark)
         prefs.setInkWarmPaper(false)
@@ -34,9 +34,21 @@ class InkQuoteTest {
         assertEquals(InkAppearance.Dark, again.inkAppearance.first())
         assertFalse(again.inkWarmPaper.first())
         prefs.setInkAppearance(InkAppearance.System)
+        assertEquals(InkAppearance.System, HomePrefs(ApplicationProvider.getApplicationContext()).inkAppearance.first())
+        prefs.setInkAppearance(InkAppearance.Light)
         prefs.setInkWarmPaper(true)
-        assertEquals(InkAppearance.Light, InkAppearance.of("light"))
-        assertEquals(InkAppearance.System, InkAppearance.of("something else"))
+        assertEquals(InkAppearance.Dark, InkAppearance.of("dark"))
+        assertEquals(InkAppearance.Light, InkAppearance.of("something else"))
+        assertEquals(InkAppearance.Light, InkAppearance.of(null))
+    }
+
+    @Test fun lightInkStaysLightWhenThePhoneIsInDarkMode() {
+        assertFalse(InkAppearance.Light.isDark(systemDark = true))
+        assertFalse(InkAppearance.Light.isDark(systemDark = false))
+        assertTrue(InkAppearance.Dark.isDark(systemDark = false))
+        assertTrue(InkAppearance.System.isDark(systemDark = true))
+        assertFalse(InkAppearance.System.isDark(systemDark = false))
+        assertFalse(InkAppearance.DEFAULT.isDark(systemDark = true))
     }
 
     @Test fun handLettersOnlyWhenTheyCanWriteIt() {
