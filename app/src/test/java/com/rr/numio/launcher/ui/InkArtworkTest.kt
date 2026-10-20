@@ -2,6 +2,7 @@ package com.rr.numio.launcher.ui
 
 import com.rr.numio.launcher.data.Background
 import com.rr.numio.launcher.data.InkAppearance
+import com.rr.numio.launcher.data.InkDrawing
 import com.rr.numio.launcher.sketch.InkArtwork
 import com.rr.numio.launcher.sketch.SketchPalette
 import org.junit.Assert.assertEquals
@@ -15,8 +16,9 @@ import org.junit.Test
 class InkArtworkTest {
 
     /** What the home page draws for this setting while the phone is (or isn't) in dark mode. */
-    private fun artFor(appearance: InkAppearance, phoneDark: Boolean, warm: Boolean = true) =
-        InkArtwork.of(homeColors(Background.Paper, appearance.isDark(phoneDark), warm).icons)
+    private fun artFor(
+        appearance: InkAppearance, phoneDark: Boolean, warm: Boolean = true, drawing: InkDrawing = InkDrawing.DEFAULT,
+    ) = InkArtwork.of(homeColors(Background.Paper, appearance.isDark(phoneDark), warm).icons, drawing)
 
     @Test fun lightPalettesKeepTheSketchbookLandscape() {
         assertEquals(InkArtwork.Sketchbook, InkArtwork.of(SketchPalette.LIGHT_WARM))
@@ -50,5 +52,33 @@ class InkArtworkTest {
 
     @Test fun solNeverUsesInkDrawings() {
         assertFalse(SolColors.sketchbook)
+    }
+
+    // ── the Drawing choice ──────────────────────────────────────────────────
+
+    @Test fun matchTheModeIsTheDefault() {
+        assertEquals(InkDrawing.Auto, InkDrawing.DEFAULT)
+        assertEquals(InkDrawing.Auto, InkDrawing.of(null))
+        assertEquals(InkDrawing.Auto, InkDrawing.of("something old"))
+    }
+
+    @Test fun savedChoicesReadBack() {
+        InkDrawing.entries.forEach { assertEquals(it, InkDrawing.of(it.id)) }
+    }
+
+    @Test fun nightLakeInLightInkUsesThePaperVersion() {
+        assertEquals(InkArtwork.NightOnPaper, artFor(InkAppearance.Light, phoneDark = false, drawing = InkDrawing.NightLake))
+        assertEquals(InkArtwork.NightOnPaper, artFor(InkAppearance.Light, phoneDark = true, drawing = InkDrawing.NightLake))
+        assertEquals(InkArtwork.NightOnPaper, artFor(InkAppearance.Light, phoneDark = false, warm = false, drawing = InkDrawing.NightLake))
+    }
+
+    @Test fun nightLakeInDarkInkUsesTheBlackVersion() {
+        assertEquals(InkArtwork.Night, artFor(InkAppearance.Dark, phoneDark = false, drawing = InkDrawing.NightLake))
+        assertEquals(InkArtwork.Night, artFor(InkAppearance.System, phoneDark = true, drawing = InkDrawing.NightLake))
+    }
+
+    @Test fun sketchbookCanBeChosenInBothModes() {
+        assertEquals(InkArtwork.Sketchbook, artFor(InkAppearance.Light, phoneDark = false, drawing = InkDrawing.Sketchbook))
+        assertEquals(InkArtwork.Sketchbook, artFor(InkAppearance.Dark, phoneDark = false, drawing = InkDrawing.Sketchbook))
     }
 }

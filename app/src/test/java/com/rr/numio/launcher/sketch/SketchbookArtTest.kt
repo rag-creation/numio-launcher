@@ -148,9 +148,41 @@ class SketchbookArtTest {
         assertEquals("ab0eee90afd9fc318c5be1b233a180fc207d03f3a023eda9d9ac8d335b6c3196", hash)
     }
 
-    private fun night(): Bitmap = BitmapFactory.decodeResource(
-        context.resources, InkArtwork.NIGHT_RES, BitmapFactory.Options().apply { inScaled = false },
+    private fun night(art: InkArtwork = InkArtwork.Night): Bitmap = BitmapFactory.decodeResource(
+        context.resources, art.res, BitmapFactory.Options().apply { inScaled = false },
     )
+
+    @Test fun lightNightLakeIsDarkPenAndGoldOnClearPaper() {
+        val b = night(InkArtwork.NightOnPaper)
+        assertEquals(841, b.width)
+        assertEquals(762, b.height)
+        assertEquals(0, Color.alpha(b.getPixel(0, 0)))
+        assertEquals(0, Color.alpha(b.getPixel(b.width - 1, b.height - 1)))
+        var ink = 0; var gold = 0; var light = 0
+        for (y in 0 until b.height step 2) for (x in 0 until b.width step 2) {
+            val c = b.getPixel(x, y)
+            if (Color.alpha(c) < 160) continue
+            val r = Color.red(c); val g = Color.green(c); val bl = Color.blue(c)
+            if (lum(c) < 60) ink++
+            if (r > 200 && g in 120..200 && bl < 90) gold++
+            if (lum(c) > 200) light++
+        }
+        assertTrue("no dark pen lines ($ink)", ink > 1500)
+        assertTrue("no gold moon or reflection ($gold)", gold > 800)
+        // nothing pale is left over from the dark version (it would vanish on the paper)
+        assertEquals(0, light)
+    }
+
+    @Test fun bothNightLakesAreTheSameDrawing() {
+        // same lines in the same places: where one has a mark, so does the other
+        val d = night(InkArtwork.Night)
+        val l = night(InkArtwork.NightOnPaper)
+        var differ = 0
+        for (y in 0 until d.height step 3) for (x in 0 until d.width step 3) {
+            if (kotlin.math.abs(Color.alpha(d.getPixel(x, y)) - Color.alpha(l.getPixel(x, y))) > 2) differ++
+        }
+        assertEquals(0, differ)
+    }
 
     @Test fun darkInkNightSceneIsCreamPenAndGoldOnClearBlack() {
         val b = night()
@@ -177,9 +209,9 @@ class SketchbookArtTest {
     }
 
     @Test fun saveArtworkComparison() {
-        // Light Ink and Dark Ink side by side, each drawing in the space the A73's home gives it
+        // Light Ink's two drawings and Dark Ink's night lake side by side, each in the space the A73's home gives it
         val w = 1080; val h = 1200; val gap = 40
-        val sheet = Bitmap.createBitmap(w * 2 + gap, h, Bitmap.Config.ARGB_8888)
+        val sheet = Bitmap.createBitmap(w * 3 + gap * 2, h, Bitmap.Config.ARGB_8888)
         val c = Canvas(sheet)
         c.drawColor(0xFF7F7F7F.toInt())
         val paint = Paint(Paint.FILTER_BITMAP_FLAG)
@@ -194,15 +226,21 @@ class SketchbookArtTest {
         page(0f, 0xFFEFE6D3.toInt(), dark = false)
         c.drawBitmap(LandscapeArt.render(LandscapeArt.marks(context), w - 80, h - 60), 40f, 30f, paint)
 
-        val left = (w + gap).toFloat()
-        page(left, 0xFF0F0F0E.toInt(), dark = true)
         // fitted whole, bottom-centred, as the home screen draws it
-        val n = night()
-        val boxW = w - 80f; val boxH = h - 60f
-        val s = minOf(boxW / n.width, boxH / n.height)
-        val dw = n.width * s; val dh = n.height * s
-        val dx = left + 40f + (boxW - dw) / 2; val dy = 30f + boxH - dh
-        c.drawBitmap(n, null, android.graphics.RectF(dx, dy, dx + dw, dy + dh), paint)
+        fun lake(left: Float, art: InkArtwork) {
+            val n = night(art)
+            val boxW = w - 80f; val boxH = h - 60f
+            val s = minOf(boxW / n.width, boxH / n.height)
+            val dw = n.width * s; val dh = n.height * s
+            val dx = left + 40f + (boxW - dw) / 2; val dy = 30f + boxH - dh
+            c.drawBitmap(n, null, android.graphics.RectF(dx, dy, dx + dw, dy + dh), paint)
+        }
+        val mid = (w + gap).toFloat()
+        page(mid, 0xFFEFE6D3.toInt(), dark = false)
+        lake(mid, InkArtwork.NightOnPaper)
+        val right = (2 * (w + gap)).toFloat()
+        page(right, 0xFF0F0F0E.toInt(), dark = true)
+        lake(right, InkArtwork.Night)
 
         val f = File(out, "ink-artwork-light-vs-dark.png")
         f.outputStream().use { sheet.compress(Bitmap.CompressFormat.PNG, 100, it) }

@@ -41,6 +41,21 @@ enum class InkAppearance(val id: String, val label: String) {
     }
 }
 
+/**
+ * Ink's page drawing. [Auto] (the default): the sketchbook landscape in Light Ink and the
+ * night lake in Dark Ink. Or the same drawing in both.
+ */
+enum class InkDrawing(val id: String, val label: String) {
+    Auto("auto", "Match the mode"),
+    Sketchbook("sketchbook", "Sketchbook"),
+    NightLake("night", "Night lake");
+
+    companion object {
+        val DEFAULT = Auto
+        fun of(id: String?) = entries.firstOrNull { it.id == id } ?: DEFAULT
+    }
+}
+
 /** Sol's clock styles. [id] is what's saved, so renaming a label never loses the choice. */
 enum class SolClock(val id: String, val label: String) {
     Fraunces("fraunces", "Fraunces"),
@@ -110,6 +125,13 @@ class HomePrefs(context: Context) {
 
     suspend fun setInkAppearance(a: InkAppearance) {
         store.edit { it[INK_APPEARANCE] = a.id }
+    }
+
+    /** Ink's page drawing (see [InkDrawing]). */
+    val inkDrawing: Flow<InkDrawing> = store.data.map { p -> InkDrawing.of(p[INK_DRAWING]) }
+
+    suspend fun setInkDrawing(d: InkDrawing) {
+        store.edit { it[INK_DRAWING] = d.id }
     }
 
     /** Light Ink's paper: the warm sketchbook paper (default) or Numio's website paper. */
@@ -236,6 +258,7 @@ class HomePrefs(context: Context) {
         private val INK_QUOTE_ON = booleanPreferencesKey("ink_quote_on")
         private val INK_APPEARANCE = stringPreferencesKey("ink_appearance")
         private val INK_WARM_PAPER = booleanPreferencesKey("ink_warm_paper")
+        private val INK_DRAWING = stringPreferencesKey("ink_drawing")
         private val INK_STATUS_BAR = booleanPreferencesKey("ink_status_bar")
         private val INK_PAGE = stringPreferencesKey("ink_page")
     }

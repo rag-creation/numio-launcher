@@ -380,6 +380,14 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch { prefs.setInkWarmPaper(warm) }
     }
 
+    /** Ink's page drawing: match the mode (default), the sketchbook, or the night lake. */
+    val inkDrawing: StateFlow<com.rr.numio.launcher.data.InkDrawing> =
+        prefs.inkDrawing.stateIn(viewModelScope, SharingStarted.Eagerly, com.rr.numio.launcher.data.InkDrawing.DEFAULT)
+
+    fun setInkDrawing(d: com.rr.numio.launcher.data.InkDrawing) {
+        viewModelScope.launch { prefs.setInkDrawing(d) }
+    }
+
     /** Ink: show (default) or hide the Android status bar. */
     val inkStatusBar: StateFlow<Boolean> = prefs.inkStatusBar.stateIn(viewModelScope, SharingStarted.Eagerly, true)
 

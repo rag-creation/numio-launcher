@@ -2,6 +2,7 @@ package com.rr.numio.launcher.ui
 
 import androidx.compose.foundation.Canvas
 import com.rr.numio.launcher.sketch.InkArtwork
+import com.rr.numio.launcher.data.InkDrawing
 import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.imageResource
@@ -115,9 +116,10 @@ fun Modifier.sketchbookPaper(colors: NumioColors): Modifier {
  * Decoration only: neither drawing takes touches.
  */
 @Composable
-fun InkLandscape(palette: SketchPalette, modifier: Modifier = Modifier) {
-    if (InkArtwork.of(palette) == InkArtwork.Night) {
-        InkNightScene(modifier)
+fun InkLandscape(palette: SketchPalette, modifier: Modifier = Modifier, drawing: InkDrawing = InkDrawing.DEFAULT) {
+    val art = InkArtwork.of(palette, drawing)
+    if (art != InkArtwork.Sketchbook) {
+        InkNightScene(art, modifier)
         return
     }
     val context = LocalContext.current
@@ -136,13 +138,13 @@ fun InkLandscape(palette: SketchPalette, modifier: Modifier = Modifier) {
 
 /**
  * Dark Ink's night scene: the approved pen drawing, shown whole (never stretched or cropped),
- * sitting at the bottom of the space and centred. Its black is transparent, so the dark
- * page shows through and there is no visible edge.
+ * sitting at the bottom of the space and centred. Its background is transparent, so the
+ * page (dark, or the cream paper for the light version) shows through with no visible edge.
  */
 @Composable
-private fun InkNightScene(modifier: Modifier) {
+private fun InkNightScene(art: InkArtwork, modifier: Modifier) {
     Image(
-        bitmap = ImageBitmap.imageResource(InkArtwork.NIGHT_RES),
+        bitmap = ImageBitmap.imageResource(art.res),
         contentDescription = null,
         contentScale = ContentScale.Fit,
         alignment = Alignment.BottomCenter,
@@ -357,10 +359,12 @@ fun AppearanceDialog(
     warm: Boolean,
     onAppearance: (InkAppearance) -> Unit,
     onWarm: (Boolean) -> Unit,
+    drawing: InkDrawing = InkDrawing.DEFAULT,
+    onDrawing: (InkDrawing) -> Unit = {},
     onDismiss: () -> Unit,
 ) {
     Dialog(onDismissRequest = onDismiss) {
-        AppearanceContent(appearance, warm, onAppearance, onWarm, onDismiss)
+        AppearanceContent(appearance, warm, onAppearance, onWarm, onDismiss, drawing, onDrawing)
     }
 }
 
@@ -371,6 +375,8 @@ fun AppearanceContent(
     onAppearance: (InkAppearance) -> Unit,
     onWarm: (Boolean) -> Unit,
     onDone: () -> Unit,
+    drawing: InkDrawing = InkDrawing.DEFAULT,
+    onDrawing: (InkDrawing) -> Unit = {},
 ) {
     val colors = LocalPaper.current
     Column(
@@ -392,6 +398,11 @@ fun AppearanceContent(
         Text("Light paper", style = TextStyle(color = colors.ink, fontSize = 13.sp, fontWeight = FontWeight.SemiBold))
         ChoiceRow("Warm sketchbook", warm, colors) { onWarm(true) }
         ChoiceRow("Numio paper", !warm, colors) { onWarm(false) }
+        Spacer(Modifier.height(12.dp))
+        Text("Drawing", style = TextStyle(color = colors.ink, fontSize = 13.sp, fontWeight = FontWeight.SemiBold))
+        ChoiceRow("Match the mode", drawing == InkDrawing.Auto, colors, "Sketchbook in Light, night lake in Dark") { onDrawing(InkDrawing.Auto) }
+        ChoiceRow("Sketchbook", drawing == InkDrawing.Sketchbook, colors) { onDrawing(InkDrawing.Sketchbook) }
+        ChoiceRow("Night lake", drawing == InkDrawing.NightLake, colors) { onDrawing(InkDrawing.NightLake) }
         Spacer(Modifier.height(8.dp))
         Box(
             contentAlignment = Alignment.Center,
@@ -406,7 +417,7 @@ fun AppearanceContent(
 }
 
 @Composable
-private fun ChoiceRow(label: String, selected: Boolean, colors: NumioColors, onSelect: () -> Unit) {
+private fun ChoiceRow(label: String, selected: Boolean, colors: NumioColors, hint: String? = null, onSelect: () -> Unit) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
@@ -416,6 +427,9 @@ private fun ChoiceRow(label: String, selected: Boolean, colors: NumioColors, onS
     ) {
         RadioButton(selected = selected, onClick = null, colors = RadioButtonDefaults.colors(selectedColor = colors.gold, unselectedColor = colors.inkSoft))
         Spacer(Modifier.width(10.dp))
-        Text(label, style = TextStyle(color = colors.ink, fontSize = 15.sp))
+        Column {
+            Text(label, style = TextStyle(color = colors.ink, fontSize = 15.sp))
+            if (hint != null) Text(hint, style = TextStyle(color = colors.inkSoft, fontSize = 12.sp))
+        }
     }
 }

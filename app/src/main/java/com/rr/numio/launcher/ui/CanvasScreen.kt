@@ -41,6 +41,7 @@ import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.zIndex
 import com.rr.numio.launcher.data.GridItem
+import com.rr.numio.launcher.data.InkDrawing
 import com.rr.numio.launcher.data.InkPage
 import com.rr.numio.launcher.data.Slot
 import androidx.compose.runtime.getValue
@@ -122,6 +123,7 @@ fun CanvasScreen(
     var editQuote by remember { mutableStateOf(false) }
     val appearance by vm.inkAppearance.collectAsStateWithLifecycle()
     val warmPaper by vm.inkWarmPaper.collectAsStateWithLifecycle()
+    val drawing by vm.inkDrawing.collectAsStateWithLifecycle()
     var editAppearance by remember { mutableStateOf(false) }
     val showStatusBar by vm.inkStatusBar.collectAsStateWithLifecycle()
     val swipe = with(LocalDensity.current) { 56.dp.toPx() }
@@ -134,7 +136,10 @@ fun CanvasScreen(
     }
 
     if (editAppearance) {
-        AppearanceDialog(appearance, warmPaper, vm::setInkAppearance, vm::setInkWarmPaper) { editAppearance = false }
+        AppearanceDialog(
+            appearance, warmPaper, vm::setInkAppearance, vm::setInkWarmPaper,
+            drawing = drawing, onDrawing = vm::setInkDrawing,
+        ) { editAppearance = false }
     }
 
     Box(
@@ -192,6 +197,7 @@ fun CanvasScreen(
                 showStatusBar = showStatusBar,
                 onToggleStatusBar = { vm.setInkStatusBar(!showStatusBar) },
                 landscape = page,
+                drawing = drawing,
                 modifier = Modifier.weight(1f).fillMaxWidth(),
             ) { openMenu ->
                 InkPageGrid(vm, colors, pageApps, apps, placement, openMenu)
@@ -458,6 +464,7 @@ private fun CanvasMenuArea(
     showStatusBar: Boolean,
     onToggleStatusBar: () -> Unit,
     landscape: Boolean,
+    drawing: InkDrawing,
     modifier: Modifier,
     /** The page's apps, drawn over the drawing. Its empty cells call openMenu on long-press. */
     grid: @Composable (openMenu: (Offset) -> Unit) -> Unit,
@@ -467,7 +474,7 @@ private fun CanvasMenuArea(
 
     Box(modifier) {
         // The page's drawing fills the open space, behind the apps (decoration only, never touched)
-        if (landscape) InkLandscape(colors.icons, Modifier.fillMaxSize().padding(top = 8.dp, bottom = 14.dp))
+        if (landscape) InkLandscape(colors.icons, Modifier.fillMaxSize().padding(top = 8.dp, bottom = 14.dp), drawing)
         // The grid covers the whole area: long-press on an empty spot opens the home menu,
         // long-press on an app is the app's own (hold and move to drag it)
         grid { menuAt = it }
