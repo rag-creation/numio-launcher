@@ -247,7 +247,7 @@ fun ShelfScreen(vm: LauncherViewModel, mode: ShelfMode, modifier: Modifier = Mod
         )
     }
     // the page's curled corner, top right (decoration only)
-    if (page) PageCurlCorner(84.dp, Modifier.align(Alignment.TopEnd))
+    if (page) PageCurlCorner(84.dp, colors.pageDark, Modifier.align(Alignment.TopEnd))
     }
 }
 

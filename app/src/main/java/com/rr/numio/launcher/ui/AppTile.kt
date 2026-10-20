@@ -56,14 +56,17 @@ import com.rr.numio.launcher.sketch.SketchIcons
 
 /** Ink draws its own sketch icon; Sol draws the app's themed icon on a sage or cream circle. */
 @Composable
-fun AppIcon(entry: AppEntry, size: Dp, modifier: Modifier = Modifier, sketch: Boolean = true) {
+fun AppIcon(
+    entry: AppEntry, size: Dp, modifier: Modifier = Modifier, sketch: Boolean = true,
+    palette: com.rr.numio.launcher.sketch.SketchPalette = com.rr.numio.launcher.sketch.SketchPalette.LIGHT_WARM,
+) {
     val context = LocalContext.current
     val px = with(LocalDensity.current) { size.roundToPx() }
     // Ink: redraw when a sketch icon is picked by hand
     val picks = if (sketch) SketchChoices.version.intValue else 0
-    val start = if (sketch) SketchIcons.cached(entry, px) else ThemedIcons.cached(entry, px)
-    val bitmap: ImageBitmap? by produceState(start, entry.key, px, sketch, picks) {
-        value = if (sketch) SketchIcons.load(context, entry, px) else ThemedIcons.load(entry, px)
+    val start = if (sketch) SketchIcons.cached(entry, px, palette) else ThemedIcons.cached(entry, px)
+    val bitmap: ImageBitmap? by produceState(start, entry.key, px, sketch, picks, palette) {
+        value = if (sketch) SketchIcons.load(context, entry, px, palette) else ThemedIcons.load(entry, px)
     }
     Box(modifier.size(size)) {
         bitmap?.let { Image(it, contentDescription = null, modifier = Modifier.fillMaxSize()) }
@@ -167,6 +170,7 @@ fun AppTile(
                     entry, iconSize,
                     Modifier.onGloballyPositioned { bounds = it.boundsInWindow() },
                     sketch = colors.sketch,
+                    palette = colors.icons,
                 )
             }
             if (showLabel) {

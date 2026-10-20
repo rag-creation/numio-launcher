@@ -105,6 +105,9 @@ fun CanvasScreen(
     val portal by vm.portal.collectAsStateWithLifecycle()
     val quote by vm.inkQuote.collectAsStateWithLifecycle()
     var editQuote by remember { mutableStateOf(false) }
+    val appearance by vm.inkAppearance.collectAsStateWithLifecycle()
+    val warmPaper by vm.inkWarmPaper.collectAsStateWithLifecycle()
+    var editAppearance by remember { mutableStateOf(false) }
     val swipe = with(LocalDensity.current) { 56.dp.toPx() }
     val now = rememberNow()
     // Ink on paper is a sketchbook page; on the wallpaper it keeps its clean look
@@ -112,6 +115,10 @@ fun CanvasScreen(
 
     if (editQuote) {
         QuoteDialog(quote, onSave = { vm.setInkQuote(it); editQuote = false }, onDismiss = { editQuote = false })
+    }
+
+    if (editAppearance) {
+        AppearanceDialog(appearance, warmPaper, vm::setInkAppearance, vm::setInkWarmPaper) { editAppearance = false }
     }
 
     Box(
@@ -165,6 +172,7 @@ fun CanvasScreen(
                 onRequestHome = onRequestHome,
                 onLauncherInfo = onOpenLauncherInfo,
                 onEditQuote = if (page) ({ editQuote = true }) else null,
+                onAppearance = { editAppearance = true },
                 landscape = page,
                 modifier = Modifier.weight(1f).fillMaxWidth(),
             )
@@ -426,6 +434,7 @@ private fun CanvasMenuArea(
     onRequestHome: () -> Unit,
     onLauncherInfo: () -> Unit,
     onEditQuote: (() -> Unit)?,
+    onAppearance: () -> Unit,
     landscape: Boolean,
     modifier: Modifier,
 ) {
@@ -442,7 +451,7 @@ private fun CanvasMenuArea(
         }
     ) {
         // The page's drawing fills the open space; long-press still opens the menu over it
-        if (landscape) InkLandscape(Modifier.fillMaxSize().padding(top = 8.dp, bottom = 14.dp))
+        if (landscape) InkLandscape(colors.icons, Modifier.fillMaxSize().padding(top = 8.dp, bottom = 14.dp))
         val at = menuAt
         Box(
             Modifier.offset(
@@ -468,6 +477,7 @@ private fun CanvasMenuArea(
                     text = { Text(tick(showCalendar, "Show next calendar event")) },
                     onClick = { menuAt = null; onToggleCalendar() },
                 )
+                DropdownMenuItem(text = { Text("Ink appearance…") }, onClick = { menuAt = null; onAppearance() })
                 if (onEditQuote != null) {
                     DropdownMenuItem(text = { Text("Quote…") }, onClick = { menuAt = null; onEditQuote() })
                 }

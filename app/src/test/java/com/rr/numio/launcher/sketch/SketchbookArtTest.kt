@@ -76,6 +76,43 @@ class SketchbookArtTest {
         assertTrue("edges look hard ($soft soft px)", soft > size)
     }
 
+    private fun lum(c: Int) = (Color.red(c) * 299 + Color.green(c) * 587 + Color.blue(c) * 114) / 1000
+
+    @Test fun darkLandscapeIsCreamLineworkWithOutlinedPines() {
+        val marks = LandscapeArt.marks(context)
+        val w = 690; val h = 640
+        val dark = LandscapeArt.render(marks, w, h, SketchPalette.DARK)
+        val light = LandscapeArt.render(marks, w, h, SketchPalette.LIGHT_WARM)
+        var cream = 0; var black = 0; var lightInk = 0
+        for (y in 0 until h step 2) for (x in 0 until w step 2) {
+            val d = dark.getPixel(x, y)
+            if (Color.alpha(d) > 200 && lum(d) > 200) cream++
+            if (Color.alpha(d) > 200 && lum(d) < 40) black++        // page-coloured pine bodies
+            val l = light.getPixel(x, y)
+            if (Color.alpha(l) > 200 && lum(l) < 60) lightInk++
+        }
+        assertTrue("dark has no cream lines ($cream)", cream > 200)
+        assertTrue("dark pines aren't outlined ($black)", black > 200)
+        // the light page has solid ink pines, so far more dark ink than the dark page has cream
+        assertTrue(lightInk > cream)
+    }
+
+    @Test fun darkCurlIsVisibleButNotBright() {
+        val b = PageCurl.render(220, dark = true)
+        val w = b.width
+        val page = 0xFF0F0F0E.toInt()
+        var visible = 0; var bright = 0
+        for (y in 0 until w) for (x in 0 until w) {
+            val c = b.getPixel(x, y)
+            if (Color.alpha(c) < 250) continue
+            val l = lum(c)
+            if (kotlin.math.abs(l - lum(page)) > 18) visible++
+            if (l > 120) bright++
+        }
+        assertTrue("dark curl blends into the page ($visible)", visible > 220 * 8)
+        assertEquals("dark curl has a bright patch", 0, bright)
+    }
+
     @Test fun savePreviews() {
         // the home illustration on paper, and the drawer's corner, at the A73's real sizes
         val w = 1080; val h = 1200
@@ -89,5 +126,15 @@ class SketchbookArtTest {
         c.drawBitmap(curl, (w - curl.width).toFloat(), 0f, null)
         File(out, "ink-sketchbook.png").outputStream().use { page.compress(Bitmap.CompressFormat.PNG, 100, it) }
         assertTrue(File(out, "ink-sketchbook.png").length() > 0)
+        // the same in Dark Ink
+        val darkPage = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+        val dc = Canvas(darkPage)
+        dc.drawColor(0xFF0F0F0E.toInt())
+        val dg = PaperGrain.bitmap(dark = true)
+        for (y in 0 until h step PaperGrain.SIZE) for (x in 0 until w step PaperGrain.SIZE) dc.drawBitmap(dg, x.toFloat(), y.toFloat(), null)
+        dc.drawBitmap(LandscapeArt.render(LandscapeArt.marks(context), w - 80, h - 60, SketchPalette.DARK), 40f, 30f, Paint(Paint.FILTER_BITMAP_FLAG))
+        val dcurl = PageCurl.render((84 * 2.625f).toInt(), dark = true)
+        dc.drawBitmap(dcurl, (w - dcurl.width).toFloat(), 0f, null)
+        File(out, "ink-sketchbook-dark.png").outputStream().use { darkPage.compress(Bitmap.CompressFormat.PNG, 100, it) }
     }
 }

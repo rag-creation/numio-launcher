@@ -19,6 +19,17 @@ enum class HomeTheme { Ink, Sol }
 /** Sol's two wallpapers: Garden (painted, the default) and Petal (cut paper). */
 enum class SolWallpaper { Garden, Petal }
 
+/** How Ink looks: follow Android's dark theme (default), or always light or dark. */
+enum class InkAppearance(val id: String, val label: String) {
+    System("system", "Follow system"),
+    Light("light", "Light"),
+    Dark("dark", "Dark");
+
+    companion object {
+        fun of(id: String?) = entries.firstOrNull { it.id == id } ?: System
+    }
+}
+
 /** Sol's clock styles. [id] is what's saved, so renaming a label never loses the choice. */
 enum class SolClock(val id: String, val label: String) {
     Fraunces("fraunces", "Fraunces"),
@@ -81,6 +92,20 @@ class HomePrefs(context: Context) {
             if (choice == null) all.remove(appKey) else all[appKey] = choice
             if (all.isEmpty()) it.remove(SKETCH_ICONS) else it[SKETCH_ICONS] = SketchChoices.serialize(all)
         }
+    }
+
+    /** Ink: Light, Dark or Follow system (default). */
+    val inkAppearance: Flow<InkAppearance> = store.data.map { p -> InkAppearance.of(p[INK_APPEARANCE]) }
+
+    suspend fun setInkAppearance(a: InkAppearance) {
+        store.edit { it[INK_APPEARANCE] = a.id }
+    }
+
+    /** Light Ink's paper: the warm sketchbook paper (default) or Numio's website paper. */
+    val inkWarmPaper: Flow<Boolean> = store.data.map { p -> p[INK_WARM_PAPER] ?: true }
+
+    suspend fun setInkWarmPaper(warm: Boolean) {
+        store.edit { it[INK_WARM_PAPER] = warm }
     }
 
     /** Ink's quote under the date: shown by default, with the default words. */
@@ -176,5 +201,7 @@ class HomePrefs(context: Context) {
         private val SKETCH_ICONS = stringPreferencesKey("sketch_icons")
         private val INK_QUOTE = stringPreferencesKey("ink_quote")
         private val INK_QUOTE_ON = booleanPreferencesKey("ink_quote_on")
+        private val INK_APPEARANCE = stringPreferencesKey("ink_appearance")
+        private val INK_WARM_PAPER = booleanPreferencesKey("ink_warm_paper")
     }
 }

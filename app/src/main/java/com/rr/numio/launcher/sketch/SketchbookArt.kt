@@ -25,19 +25,24 @@ object PaperGrain {
 
     const val SIZE = 256
 
-    @Volatile private var tile: Bitmap? = null
+    @Volatile private var light: Bitmap? = null
+    @Volatile private var darkTile: Bitmap? = null
 
-    /** Transparent except for faint dark and light specks and a few fibres. */
-    fun bitmap(): Bitmap = tile ?: synchronized(this) {
-        tile ?: make(7).also { tile = it }
+    /** Transparent except for faint specks and a few fibres; fainter still on the dark page. */
+    fun bitmap(dark: Boolean = false): Bitmap = synchronized(this) {
+        if (dark) darkTile ?: make(7, true).also { darkTile = it } else light ?: make(7, false).also { light = it }
     }
 
-    fun make(seed: Int): Bitmap {
+    fun make(seed: Int, dark: Boolean = false): Bitmap {
         val rnd = Random(seed)
         val px = IntArray(SIZE * SIZE)
         for (i in px.indices) {
             val v = rnd.nextFloat()
-            px[i] = when {
+            px[i] = if (dark) when {
+                v < 0.10f -> (rnd.nextInt(10, 22) shl 24) or 0x000000           // a touch deeper
+                v > 0.94f -> (rnd.nextInt(4, 9) shl 24) or 0xF1EEE6             // very faint light grain
+                else -> 0
+            } else when {
                 v < 0.10f -> (rnd.nextInt(6, 13) shl 24) or 0x3A3020            // faint dark grain
                 v > 0.93f -> (rnd.nextInt(10, 22) shl 24) or 0xFFFFFC           // faint light grain
                 else -> 0
@@ -51,8 +56,12 @@ object PaperGrain {
             val y = rnd.nextFloat() * SIZE
             val len = 8f + rnd.nextFloat() * 22f
             val a = rnd.nextFloat() * PI.toFloat()
-            val dark = rnd.nextFloat() < 0.45f
-            p.color = if (dark) 0x14786A58 else 0x3CFFFFFC
+            val darkFibre = rnd.nextFloat() < 0.45f
+            p.color = when {
+                dark -> if (darkFibre) 0x28000000 else 0x0EF1EEE6       // fibres barely there on the dark page
+                darkFibre -> 0x14786A58
+                else -> 0x3CFFFFFC
+            }
             val path = Path().apply {
                 moveTo(x, y)
                 quadTo(
@@ -109,8 +118,12 @@ object LandscapeArt {
     /** The scale that fits the drawing into [w] x [h] (it never stretches). */
     fun scaleFor(w: Int, h: Int): Float = minOf(w / WIDTH, h / HEIGHT)
 
-    /** The landscape in a [w] x [h] bitmap, fitted and anchored bottom-right. */
-    fun render(marks: List<Mark>, w: Int, h: Int): Bitmap {
+    /**
+     * The landscape in a [w] x [h] bitmap, fitted and anchored bottom-right, in [p]'s colours.
+     * On the dark page the ink becomes cream linework and the pines are drawn as outlines
+     * (solid cream pines would be heavy blocks); the sun glows a little more.
+     */
+    fun render(marks: List<Mark>, w: Int, h: Int, p: SketchPalette = SketchPalette.LIGHT_WARM): Bitmap {
         val bmp = Bitmap.createBitmap(w.coerceAtLeast(1), h.coerceAtLeast(1), Bitmap.Config.ARGB_8888)
         val s = scaleFor(w, h)
         if (s <= 0f) return bmp
@@ -121,10 +134,14 @@ object LandscapeArt {
             style = Paint.Style.STROKE; strokeCap = Paint.Cap.ROUND; strokeJoin = Paint.Join.ROUND
         }
         val fill = Paint(Paint.ANTI_ALIAS_FLAG)
+        val ink = p.ink
+        val amber = p.gold
+        fun tone(c: Int) = if (c == AMBER) amber else ink
         for (m in marks) when (m) {
             is Mark.Sun -> {
                 // a watercolour wash: soft edge, a slightly darker rim where the pigment dried
-                val a = 0x9E
+                val a = if (p.dark) 0xB4 else 0x9E
+                val AMBER = amber
                 fill.shader = RadialGradient(
                     m.x, m.y, m.r * 1.06f,
                     intArrayOf(withAlpha(AMBER, a - 12), withAlpha(AMBER, a - 6), withAlpha(AMBER, a + 14), withAlpha(AMBER, 0)),
@@ -134,16 +151,26 @@ object LandscapeArt {
                 fill.shader = null
             }
             is Mark.Line -> {
-                stroke.color = withAlpha(m.color, m.alpha)
+                stroke.color = withAlpha(tone(m.color), m.alpha)
                 stroke.strokeWidth = m.width
                 c.drawPath(path(m.points, close = false), stroke)
             }
             is Mark.Fill -> {
-                fill.color = withAlpha(m.color, m.alpha)
-                c.drawPath(path(m.points, close = true), fill)
+                val shape = path(m.points, close = true)
+                if (p.dark) {
+                    // the page shows through, outlined in cream
+                    fill.color = p.paper
+                    c.drawPath(shape, fill)
+                    stroke.color = withAlpha(ink, m.alpha)
+                    stroke.strokeWidth = 1.3f
+                    c.drawPath(shape, stroke)
+                } else {
+                    fill.color = withAlpha(tone(m.color), m.alpha)
+                    c.drawPath(shape, fill)
+                }
             }
             is Mark.Dot -> {
-                fill.color = withAlpha(m.color, m.alpha)
+                fill.color = withAlpha(tone(m.color), m.alpha)
                 c.drawCircle(m.x, m.y, m.r, fill)
             }
         }
@@ -169,9 +196,10 @@ object LandscapeArt {
  */
 object PageCurl {
 
-    private val cache = HashMap<Int, Bitmap>()
+    private val cache = HashMap<Long, Bitmap>()
 
-    fun bitmap(size: Int): Bitmap = synchronized(cache) { cache.getOrPut(size) { render(size) } }
+    fun bitmap(size: Int, dark: Boolean = false): Bitmap =
+        synchronized(cache) { cache.getOrPut(size.toLong() * 2 + if (dark) 1 else 0) { render(size, dark) } }
 
     /** Points of a gently bowed edge from (x0,y0) to (x1,y1). */
     private fun bow(path: Path, x0: Float, y0: Float, x1: Float, y1: Float, k: Float, first: Boolean) {
@@ -188,7 +216,8 @@ object PageCurl {
         }
     }
 
-    fun render(size: Int): Bitmap {
+    /** Light: cream paper folding back. Dark: dark paper folding back, with a fine lit edge so it reads. */
+    fun render(size: Int, dark: Boolean = false): Bitmap {
         val pad = (size * 0.25f).toInt()
         val w = size + pad
         val bmp = Bitmap.createBitmap(w, w, Bitmap.Config.ARGB_8888)
@@ -200,7 +229,7 @@ object PageCurl {
 
         // 1. the page below, in the corner the flap left
         val corner = Path().apply { moveTo(ax, ay); lineTo(w.toFloat(), 0f); lineTo(bx, by); close() }
-        c.drawPath(corner, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFFE2D7C0.toInt() })
+        c.drawPath(corner, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = if (dark) 0xFF060605.toInt() else 0xFFE2D7C0.toInt() })
 
         val flap = Path()
         bow(flap, ax, ay, tx, ty, s * 0.08f, first = true)
@@ -213,7 +242,7 @@ object PageCurl {
         c.clipOutPathCompat(corner)
         c.translate(-s * 0.04f, s * 0.06f)
         c.drawPath(flap, Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = 0x52302210
+            color = if (dark) 0xB0000000.toInt() else 0x52302210
             maskFilter = BlurMaskFilter(s * 0.08f, BlurMaskFilter.Blur.NORMAL)
         })
         c.restore()
@@ -225,11 +254,18 @@ object PageCurl {
         c.drawPath(flap, Paint(Paint.ANTI_ALIAS_FLAG).apply {
             shader = LinearGradient(
                 mx, my, mx + ux * reach, my + uy * reach,
-                intArrayOf(0xFFD3CBBA.toInt(), 0xFFF7F2E6.toInt(), 0xFFEDE6D6.toInt(), 0xFFF3EDE0.toInt(), 0xFFE4DCCB.toInt()),
+                if (dark) intArrayOf(0xFF1E1D1B.toInt(), 0xFF46443F.toInt(), 0xFF2E2D29.toInt(), 0xFF35332F.toInt(), 0xFF262522.toInt())
+                else intArrayOf(0xFFD3CBBA.toInt(), 0xFFF7F2E6.toInt(), 0xFFEDE6D6.toInt(), 0xFFF3EDE0.toInt(), 0xFFE4DCCB.toInt()),
                 floatArrayOf(0f, 0.07f, 0.22f, 0.55f, 1f),
                 Shader.TileMode.CLAMP,
             )
         })
+        if (dark) {
+            // a fine lit edge along the flap, so dark paper still reads as a fold
+            c.drawPath(flap, Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                style = Paint.Style.STROKE; strokeWidth = (s * 0.012f).coerceAtLeast(1f); color = 0x40F1EEE6
+            })
+        }
         return bmp
     }
 

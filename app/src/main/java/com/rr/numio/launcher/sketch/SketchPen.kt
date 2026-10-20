@@ -51,8 +51,14 @@ object SketchPen {
     }
 
     /** Draws [kind] centred on (cx, cy) inside a disc of radius [r]. */
-    fun draw(canvas: Canvas, kind: SketchKind, cx: Float, cy: Float, r: Float) {
+    fun draw(canvas: Canvas, kind: SketchKind, cx: Float, cy: Float, r: Float, palette: SketchPalette = SketchPalette.LIGHT_WARM) {
         val layers = SketchGlyphs.all[kind] ?: return
+        // the glyph's tones in this page's colours (light: charcoal / cream / amber; dark: cream / dark / amber)
+        fun col(t: Tone) = when (t) {
+            Tone.INK -> palette.ink
+            Tone.CREAM -> palette.cream
+            Tone.GOLD -> palette.gold
+        }
         val sc = SCALE * r / 56f
         val toScreen = Matrix().apply {
             setTranslate(-50f, -50f)
@@ -66,15 +72,15 @@ object SketchPen {
                     val p = Path(path(layer.path))
                     p.transform(toScreen)
                     p.offset(FILL_OFFSET * sc, FILL_OFFSET * sc)
-                    canvas.drawPath(p, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = layer.tone.argb })
+                    canvas.drawPath(p, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = col(layer.tone) })
                 }
-                is Layer.Ink -> line(canvas, path(layer.path), toScreen, sc, INK_W, Tone.INK.argb, 255, seed)
-                is Layer.Thin -> line(canvas, path(layer.path), toScreen, sc, THIN_W, layer.tone.argb, 255, seed)
-                is Layer.Hatch -> line(canvas, path(layer.path), toScreen, sc, HATCH_W, Tone.INK.argb, 200, seed)
+                is Layer.Ink -> line(canvas, path(layer.path), toScreen, sc, INK_W, col(Tone.INK), 255, seed)
+                is Layer.Thin -> line(canvas, path(layer.path), toScreen, sc, THIN_W, col(layer.tone), 255, seed)
+                is Layer.Hatch -> line(canvas, path(layer.path), toScreen, sc, HATCH_W, col(Tone.INK), 200, seed)
                 is Layer.Dot -> {
                     val pt = floatArrayOf(layer.x, layer.y)
                     toScreen.mapPoints(pt)
-                    canvas.drawCircle(pt[0], pt[1], layer.r * sc, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = layer.tone.argb })
+                    canvas.drawCircle(pt[0], pt[1], layer.r * sc, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = col(layer.tone) })
                 }
             }
         }

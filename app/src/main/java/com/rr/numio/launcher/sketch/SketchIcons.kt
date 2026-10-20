@@ -35,7 +35,7 @@ object SketchIcons {
 
     /** The icon's circle is the page itself, so icons read as ink circles drawn on the paper. */
     const val PAPER = 0xFFEFE6D3.toInt()
-    const val INK = 0xFF1C1A17.toInt()
+    const val INK = 0xFF191815.toInt()
     const val GOLD = 0xFFE9A800.toInt()
 
     private val cache = object : LruCache<String, ImageBitmap>(48 * 1024 * 1024) {
@@ -43,18 +43,19 @@ object SketchIcons {
     }
 
     // The hand-picked choice is part of the key, so picking another drawing draws it again
-    private fun cacheKey(entry: AppEntry, px: Int) = keyFor(entry.key, px, SketchChoices.current[entry.key])
+    private fun cacheKey(entry: AppEntry, px: Int, p: SketchPalette) = keyFor(entry.key, px, SketchChoices.current[entry.key], p.id)
 
-    internal fun keyFor(appKey: String, px: Int, choice: String?) = "$appKey@$px~${choice.orEmpty()}"
+    internal fun keyFor(appKey: String, px: Int, choice: String?, paletteId: String = SketchPalette.LIGHT_WARM.id) =
+        "$appKey@$px~${choice.orEmpty()}~$paletteId"
 
     /** The cached keys that belong to [packageName] (app keys start "package/"). */
     internal fun keysOf(keys: Collection<String>, packageName: String) = keys.filter { it.startsWith("$packageName/") }
 
-    fun cached(entry: AppEntry, px: Int): ImageBitmap? = cache.get(cacheKey(entry, px))
+    fun cached(entry: AppEntry, px: Int, p: SketchPalette = SketchPalette.LIGHT_WARM): ImageBitmap? = cache.get(cacheKey(entry, px, p))
 
-    suspend fun load(context: Context, entry: AppEntry, px: Int): ImageBitmap =
-        cached(entry, px) ?: withContext(Dispatchers.Default) {
-            render(context, entry, px).asImageBitmap().also { cache.put(cacheKey(entry, px), it) }
+    suspend fun load(context: Context, entry: AppEntry, px: Int, p: SketchPalette = SketchPalette.LIGHT_WARM): ImageBitmap =
+        cached(entry, px, p) ?: withContext(Dispatchers.Default) {
+            render(context, entry, px, p).asImageBitmap().also { cache.put(cacheKey(entry, px, p), it) }
         }
 
     /** After an app update or removal, so its icon is drawn again. */
@@ -63,11 +64,11 @@ object SketchIcons {
         keysOf(cache.snapshot().keys, packageName).forEach { cache.remove(it) }
     }
 
-    private fun render(context: Context, entry: AppEntry, px: Int): Bitmap {
+    private fun render(context: Context, entry: AppEntry, px: Int, p: SketchPalette): Bitmap {
         val bmp = Bitmap.createBitmap(px, px, Bitmap.Config.ARGB_8888)
         val kind = SketchChoices.decide(SketchChoices.current[entry.key]) { automatic(context, entry) }
         paint(context, Canvas(bmp), px, entry.key.hashCode(), entry.label, kind, entry.isMainUser,
-            derived = { cx, r -> MonoLayer.derived(entry, px, cx, r, INK) }) {
+            derived = { cx, r -> MonoLayer.derived(entry, px, cx, r, p.ink) }, palette = p) {
             MonoLayer.of(entry)
         }
         return bmp
@@ -78,11 +79,13 @@ object SketchIcons {
         SketchRoles.kindFor(entry.packageName, entry.label, SketchRoles.roles(context))
 
     /** [entry] drawn with [kind] (null: its own look), uncached: for the picker's previews. */
-    suspend fun preview(context: Context, entry: AppEntry, px: Int, kind: SketchKind?): ImageBitmap =
+    suspend fun preview(
+        context: Context, entry: AppEntry, px: Int, kind: SketchKind?, p: SketchPalette = SketchPalette.LIGHT_WARM,
+    ): ImageBitmap =
         withContext(Dispatchers.Default) {
             val bmp = Bitmap.createBitmap(px, px, Bitmap.Config.ARGB_8888)
             paint(context, Canvas(bmp), px, entry.key.hashCode(), entry.label, kind, entry.isMainUser,
-                derived = { cx, r -> MonoLayer.derived(entry, px, cx, r, INK) }) { MonoLayer.of(entry) }
+                derived = { cx, r -> MonoLayer.derived(entry, px, cx, r, p.ink) }, palette = p) { MonoLayer.of(entry) }
             bmp.asImageBitmap()
         }
 
@@ -97,8 +100,12 @@ object SketchIcons {
         context: Context, c: Canvas, px: Int, seed: Int, label: String,
         kind: SketchKind?, isMainUser: Boolean,
         derived: ((cx: Float, r: Float) -> Bitmap?)? = null,
+        palette: SketchPalette = SketchPalette.LIGHT_WARM,
         mono: () -> Drawable?,
     ) {
+        val INK = palette.ink
+        val PAPER = palette.paper
+        val GOLD = palette.gold
         val cx = px / 2f
         val r = px * 0.44f
         val stroke = (px * 0.035f).coerceAtLeast(1.5f)
@@ -116,7 +123,7 @@ object SketchIcons {
         if (kind != null) {
             c.save()
             c.clipPath(disc)
-            SketchPen.draw(c, kind, cx, cx, r)
+            SketchPen.draw(c, kind, cx, cx, r, palette)
             c.restore()
         } else if (inked != null) {
             c.save()
@@ -125,7 +132,7 @@ object SketchIcons {
             c.restore()
             inked.recycle()
         } else {
-            drawLetter(context, c, label, cx, r)
+            drawLetter(context, c, label, cx, r, INK)
         }
 
         // Ink ring: one firm line and a lighter second pass
@@ -151,7 +158,7 @@ object SketchIcons {
     }
 
 
-    private fun drawLetter(context: Context, c: Canvas, label: String, cx: Float, r: Float) {
+    private fun drawLetter(context: Context, c: Canvas, label: String, cx: Float, r: Float, INK: Int) {
         val first = label.firstOrNull { it.isLetterOrDigit() } ?: '?'
         val h = r * 0.95f
         if (SketchInk.hasGlyph(first)) {

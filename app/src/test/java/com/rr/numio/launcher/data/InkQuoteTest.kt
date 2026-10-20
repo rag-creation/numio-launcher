@@ -24,6 +24,21 @@ class InkQuoteTest {
         assertEquals(InkQuote.MAX_LENGTH, prefs.inkQuote.first().text.length)
     }
 
+    @Test fun appearanceFollowsSystemByDefaultAndIsSaved() = runBlocking {
+        val prefs = HomePrefs(ApplicationProvider.getApplicationContext())
+        assertEquals(InkAppearance.System, prefs.inkAppearance.first())
+        assertTrue(prefs.inkWarmPaper.first())
+        prefs.setInkAppearance(InkAppearance.Dark)
+        prefs.setInkWarmPaper(false)
+        val again = HomePrefs(ApplicationProvider.getApplicationContext())
+        assertEquals(InkAppearance.Dark, again.inkAppearance.first())
+        assertFalse(again.inkWarmPaper.first())
+        prefs.setInkAppearance(InkAppearance.System)
+        prefs.setInkWarmPaper(true)
+        assertEquals(InkAppearance.Light, InkAppearance.of("light"))
+        assertEquals(InkAppearance.System, InkAppearance.of("something else"))
+    }
+
     @Test fun handLettersOnlyWhenTheyCanWriteIt() {
         assertTrue(InkQuote.handwritable("Good things take time."))
         assertTrue(InkQuote.handwritable("Day 1, keep going"))

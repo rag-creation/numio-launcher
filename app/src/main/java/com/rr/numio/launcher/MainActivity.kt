@@ -41,6 +41,7 @@ import androidx.core.view.WindowCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.rr.numio.launcher.data.Background
 import com.rr.numio.launcher.data.HomeTheme
+import com.rr.numio.launcher.data.InkAppearance
 import com.rr.numio.launcher.ui.CanvasScreen
 import com.rr.numio.launcher.ui.NumioTheme
 import com.rr.numio.launcher.ui.ShelfScreen
@@ -91,15 +92,23 @@ class MainActivity : ComponentActivity() {
     private fun Home(theme: HomeTheme) {
         val bg by vm.background.collectAsStateWithLifecycle()
         val shelf by vm.shelf.collectAsStateWithLifecycle()
-        val dark = isSystemInDarkTheme()
+        val systemDark = isSystemInDarkTheme()
+        val appearance by vm.inkAppearance.collectAsStateWithLifecycle()
+        val warm by vm.inkWarmPaper.collectAsStateWithLifecycle()
         val sol = theme == HomeTheme.Sol
-        // Sol is always light, to sit on its cream wallpaper; Ink is a sketchbook page, light too
-        val home = if (sol) SolColors else homeColors(bg, dark)
-        val paper = if (sol) SolColors else paperColors(dark)
+        // Ink: Light Ink, Dark Ink, or following Android's dark theme (the default)
+        val inkDark = when (appearance) {
+            InkAppearance.System -> systemDark
+            InkAppearance.Light -> false
+            InkAppearance.Dark -> true
+        }
+        // Sol is always light, to sit on its cream wallpaper
+        val home = if (sol) SolColors else homeColors(bg, inkDark, warm)
+        val paper = if (sol) SolColors else paperColors(inkDark, warm)
 
-        // Dark status bar icons on paper; light ones only over the user's wallpaper
+        // Dark status bar icons on light paper; light ones on Dark Ink and over the wallpaper
         val shelfOpen = shelf != ShelfMode.Closed
-        val lightBars = sol || shelfOpen || bg == Background.Paper
+        val lightBars = sol || (!inkDark && (shelfOpen || bg == Background.Paper))
         SideEffect {
             WindowCompat.getInsetsController(window, window.decorView).run {
                 isAppearanceLightStatusBars = lightBars
@@ -107,7 +116,7 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-        NumioTheme(home, paper, dark = false) {
+        NumioTheme(home, paper, dark = inkDark && !sol) {
             LauncherRoot(vm, shelf, theme)
         }
     }

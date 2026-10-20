@@ -51,6 +51,7 @@ import com.rr.numio.launcher.sketch.SketchKind
 fun SketchIconDialog(entry: AppEntry, onPick: (String?) -> Unit, onDismiss: () -> Unit) {
     val context = LocalContext.current
     val px = with(LocalDensity.current) { 44.dp.roundToPx() }
+    val palette = LocalPaper.current.icons
     val auto by produceState<SketchKind?>(null, entry.key) { value = SketchIcons.automatic(context, entry) }
     Dialog(onDismissRequest = onDismiss) {
         SketchIconPickerContent(
@@ -60,7 +61,7 @@ fun SketchIconDialog(entry: AppEntry, onPick: (String?) -> Unit, onDismiss: () -
             onPick = onPick,
             onCancel = onDismiss,
         ) { kind ->
-            val bmp by produceState<ImageBitmap?>(null, entry.key, kind) { value = SketchIcons.preview(context, entry, px, kind) }
+            val bmp by produceState<ImageBitmap?>(null, entry.key, kind) { value = SketchIcons.preview(context, entry, px, kind, palette) }
             Box(Modifier.size(44.dp)) { bmp?.let { Image(it, null, Modifier.size(44.dp)) } }
         }
     }

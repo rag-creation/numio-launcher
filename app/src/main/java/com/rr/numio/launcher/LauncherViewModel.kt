@@ -317,6 +317,19 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
             .flowOn(Dispatchers.Default)
             .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
+    /** Ink: Light, Dark or Follow system, and Light Ink's paper. */
+    val inkAppearance: StateFlow<com.rr.numio.launcher.data.InkAppearance> =
+        prefs.inkAppearance.stateIn(viewModelScope, SharingStarted.Eagerly, com.rr.numio.launcher.data.InkAppearance.System)
+    val inkWarmPaper: StateFlow<Boolean> = prefs.inkWarmPaper.stateIn(viewModelScope, SharingStarted.Eagerly, true)
+
+    fun setInkAppearance(a: com.rr.numio.launcher.data.InkAppearance) {
+        viewModelScope.launch { prefs.setInkAppearance(a) }
+    }
+
+    fun setInkWarmPaper(warm: Boolean) {
+        viewModelScope.launch { prefs.setInkWarmPaper(warm) }
+    }
+
     /** Ink: the quote under the date. */
     val inkQuote: StateFlow<com.rr.numio.launcher.data.InkQuote> =
         prefs.inkQuote.stateIn(viewModelScope, SharingStarted.Eagerly, com.rr.numio.launcher.data.InkQuote())

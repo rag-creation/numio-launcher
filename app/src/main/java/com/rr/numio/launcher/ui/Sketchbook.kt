@@ -62,6 +62,11 @@ import com.rr.numio.launcher.sketch.LandscapeArt
 import com.rr.numio.launcher.sketch.PageCurl
 import com.rr.numio.launcher.sketch.PaperGrain
 import com.rr.numio.launcher.sketch.SketchInk
+import com.rr.numio.launcher.sketch.SketchPalette
+import com.rr.numio.launcher.data.InkAppearance
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.material3.RadioButton
+import androidx.compose.material3.RadioButtonDefaults
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlin.random.Random
@@ -76,8 +81,8 @@ import kotlin.random.Random
 @Composable
 fun Modifier.sketchbookPaper(colors: NumioColors): Modifier {
     if (!colors.sketchbook) return this.background(colors.background)
-    val brush = remember {
-        ShaderBrush(ImageShader(PaperGrain.bitmap().asImageBitmap(), TileMode.Repeated, TileMode.Repeated))
+    val brush = remember(colors.pageDark) {
+        ShaderBrush(ImageShader(PaperGrain.bitmap(colors.pageDark).asImageBitmap(), TileMode.Repeated, TileMode.Repeated))
     }
     return this.drawBehind {
         drawRect(colors.background)
@@ -87,30 +92,31 @@ fun Modifier.sketchbookPaper(colors: NumioColors): Modifier {
 
 /** The original ink landscape, fitted into whatever space it is given (anchored bottom-right). */
 @Composable
-fun InkLandscape(modifier: Modifier = Modifier) {
+fun InkLandscape(palette: SketchPalette, modifier: Modifier = Modifier) {
     val context = LocalContext.current
     BoxWithConstraints(modifier) {
         val w = constraints.maxWidth
         val h = constraints.maxHeight
         if (w <= 0 || h <= 0 || h == androidx.compose.ui.unit.Constraints.Infinity) return@BoxWithConstraints
-        val art by produceState<ImageBitmap?>(LandscapeCache.get(w, h), w, h) {
-            if (value == null) {
-                value = withContext(Dispatchers.Default) {
-                    LandscapeArt.render(LandscapeArt.marks(context), w, h).asImageBitmap()
-                }.also { LandscapeCache.put(w, h, it) }
-            }
+        val art by produceState(LandscapeCache.get(w, h, palette), w, h, palette) {
+            value = LandscapeCache.get(w, h, palette) ?: withContext(Dispatchers.Default) {
+                LandscapeArt.render(LandscapeArt.marks(context), w, h, palette).asImageBitmap()
+            }.also { LandscapeCache.put(w, h, palette, it) }
         }
         art?.let { Image(it, contentDescription = null, modifier = Modifier.fillMaxSize()) }
     }
 }
 
-/** The last landscape drawn, so coming back home never redraws it. */
+/** The landscapes drawn so far (one per size and palette), so coming home or switching theme back never redraws. */
 private object LandscapeCache {
-    private var key = 0L
-    private var art: ImageBitmap? = null
-    fun get(w: Int, h: Int): ImageBitmap? = if (key == (w.toLong() shl 32 or h.toLong())) art else null
-    fun put(w: Int, h: Int, a: ImageBitmap) {
-        key = w.toLong() shl 32 or h.toLong(); art = a
+    private val art = HashMap<String, ImageBitmap>()
+    private fun key(w: Int, h: Int, p: SketchPalette) = "${w}x$h:${p.id}"
+    fun get(w: Int, h: Int, p: SketchPalette): ImageBitmap? = synchronized(art) { art[key(w, h, p)] }
+    fun put(w: Int, h: Int, p: SketchPalette, a: ImageBitmap) {
+        synchronized(art) {
+            if (art.size > 4) art.clear()   // sizes change rarely; keep only a few
+            art[key(w, h, p)] = a
+        }
     }
 }
 
@@ -139,9 +145,9 @@ fun InkQuoteText(quote: InkQuote, colors: NumioColors, modifier: Modifier = Modi
 
 /** The drawer page's curled top-right corner (decoration only; touches pass through). */
 @Composable
-fun PageCurlCorner(size: Dp, modifier: Modifier = Modifier) {
+fun PageCurlCorner(size: Dp, dark: Boolean, modifier: Modifier = Modifier) {
     val px = with(LocalDensity.current) { size.roundToPx() }
-    val bmp = remember(px) { PageCurl.bitmap(px).asImageBitmap() }
+    val bmp = remember(px, dark) { PageCurl.bitmap(px, dark).asImageBitmap() }
     val full = with(LocalDensity.current) { bmp.width.toDp() }
     Image(bmp, contentDescription = null, modifier = modifier.size(full))
 }
@@ -294,5 +300,78 @@ fun QuoteEditor(initial: InkQuote, onSave: (InkQuote) -> Unit, onCancel: () -> U
                     .padding(horizontal = 20.dp),
             ) { Text("Save", style = TextStyle(color = colors.card, fontSize = 15.sp, fontWeight = FontWeight.Medium)) }
         }
+    }
+}
+
+/**
+ * Long-press home, "Ink appearance…": Light, Dark or Follow system, and Light Ink's paper
+ * (warm sketchbook or Numio's paper). Applies at once, so both can be compared on the phone.
+ */
+@Composable
+fun AppearanceDialog(
+    appearance: InkAppearance,
+    warm: Boolean,
+    onAppearance: (InkAppearance) -> Unit,
+    onWarm: (Boolean) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    Dialog(onDismissRequest = onDismiss) {
+        AppearanceContent(appearance, warm, onAppearance, onWarm, onDismiss)
+    }
+}
+
+@Composable
+fun AppearanceContent(
+    appearance: InkAppearance,
+    warm: Boolean,
+    onAppearance: (InkAppearance) -> Unit,
+    onWarm: (Boolean) -> Unit,
+    onDone: () -> Unit,
+) {
+    val colors = LocalPaper.current
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .background(colors.card, RoundedCornerShape(24.dp))
+            .padding(20.dp),
+    ) {
+        Text(
+            "Ink appearance",
+            style = TextStyle(color = colors.ink, fontSize = 20.sp, fontWeight = FontWeight.SemiBold),
+            modifier = Modifier.semantics { heading() },
+        )
+        Spacer(Modifier.height(8.dp))
+        InkAppearance.entries.forEach { a ->
+            ChoiceRow(a.label, appearance == a, colors) { onAppearance(a) }
+        }
+        Spacer(Modifier.height(12.dp))
+        Text("Light paper", style = TextStyle(color = colors.ink, fontSize = 13.sp, fontWeight = FontWeight.SemiBold))
+        ChoiceRow("Warm sketchbook", warm, colors) { onWarm(true) }
+        ChoiceRow("Numio paper", !warm, colors) { onWarm(false) }
+        Spacer(Modifier.height(8.dp))
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier
+                .align(Alignment.End)
+                .heightIn(min = 44.dp)
+                .background(colors.ink, CircleShape)
+                .clickable(role = Role.Button, onClick = onDone)
+                .padding(horizontal = 22.dp),
+        ) { Text("Done", style = TextStyle(color = colors.card, fontSize = 15.sp, fontWeight = FontWeight.Medium)) }
+    }
+}
+
+@Composable
+private fun ChoiceRow(label: String, selected: Boolean, colors: NumioColors, onSelect: () -> Unit) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 48.dp)
+            .selectable(selected = selected, role = Role.RadioButton, onClick = onSelect),
+    ) {
+        RadioButton(selected = selected, onClick = null, colors = RadioButtonDefaults.colors(selectedColor = colors.gold, unselectedColor = colors.inkSoft))
+        Spacer(Modifier.width(10.dp))
+        Text(label, style = TextStyle(color = colors.ink, fontSize = 15.sp))
     }
 }
