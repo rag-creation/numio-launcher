@@ -61,6 +61,7 @@ object SketchInk {
     private fun gap(h: Float) = h * 0.07f
     private fun spaceW(h: Float) = h * 0.38f
     private fun colonW(h: Float) = h * 0.30f
+    private fun dotW(h: Float) = h * 0.18f
 
     fun measure(context: Context, text: String, h: Float): Float {
         var w = 0f
@@ -68,6 +69,7 @@ object SketchInk {
             w += when (c) {
                 ' ' -> spaceW(h)
                 ':' -> colonW(h)
+                '.', ',' -> dotW(h)
                 else -> glyph(context, c)?.let { it.width * h / it.height } ?: 0f
             }
             if (i < text.lastIndex) w += gap(h)
@@ -104,6 +106,17 @@ object SketchInk {
                     canvas.drawCircle(mx - r * 0.1f, bottom - h * 0.24f, r * 1.05f, dot)
                     canvas.drawCircle(mx + r * 0.35f, bottom - h * 0.22f, r * 0.6f, dot)
                     cx += colonW(h)
+                }
+                '.', ',' -> {
+                    // an inked full stop on the line; a comma gets a short tail
+                    val r = h * 0.06f
+                    val mx = cx + dotW(h) / 2f
+                    canvas.drawCircle(mx, bottom - r * 1.2f, r, dot)
+                    if (c == ',') {
+                        val tail = Paint(dot).apply { style = Paint.Style.STROKE; strokeWidth = r * 0.9f; strokeCap = Paint.Cap.ROUND }
+                        canvas.drawLine(mx + r * 0.4f, bottom - r * 0.6f, mx - r * 0.6f, bottom + r * 1.6f, tail)
+                    }
+                    cx += dotW(h)
                 }
                 else -> glyph(context, c)?.let { g ->
                     val gw = g.width * h / g.height

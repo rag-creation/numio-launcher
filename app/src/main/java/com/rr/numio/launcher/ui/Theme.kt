@@ -11,7 +11,8 @@ import androidx.compose.ui.graphics.Color
 import com.rr.numio.launcher.data.Background
 
 /**
- * Numio paper palette: cream paper, near-black ink, antique gold.
+ * Numio paper palette. Ink is a sketchbook page: warm paper (an Ink-only surface), the
+ * website's ink #191815 and amber #E9A800, with #7A5600 for amber text on paper.
  * [home] is for the Canvas (paper or the wallpaper), [paper] for the Shelf and menus.
  */
 @Immutable
@@ -25,14 +26,33 @@ data class NumioColors(
     val onWallpaper: Boolean = false,
     /** Ink's hand-drawn look (sketch icons, letters, wobbly lines). False for Sol's clean look. */
     val sketch: Boolean = true,
+    /** Amber for text (headings, letters): readable on paper, unlike the accent [gold]. */
+    val goldText: Color = gold,
+    /** The sketchbook page: paper grain, the landscape and the drawer's curled corner. */
+    val sketchbook: Boolean = false,
 )
 
+/** Numio's official colours (website palette). The logo keeps its own #FFC21A untouched. */
+object NumioBrand {
+    val LOGO_AMBER = Color(0xFFFFC21A)
+    val INK = Color(0xFF191815)
+    val AMBER = Color(0xFFE9A800)
+    val AMBER_TEXT = Color(0xFF7A5600)
+    val PAPER = Color(0xFFF6F4EE)
+
+    /** Ink's own warmer sketchbook surface (Ink only; the website palette is unchanged). */
+    val SKETCHBOOK = Color(0xFFEFE6D3)
+}
+
+/** Ink: the sketchbook page. Always light, like a page of paper. */
 private val PaperLight = NumioColors(
-    background = Color(0xFFFBF3E2),
-    ink = Color(0xFF1C1A17),
-    inkSoft = Color(0xFF6B6255),
-    gold = Color(0xFFB8892B),
-    card = Color(0xFFF3E6CA),
+    background = NumioBrand.SKETCHBOOK,
+    ink = NumioBrand.INK,
+    inkSoft = Color(0xFF5E5648),
+    gold = NumioBrand.AMBER,
+    card = Color(0xFFF6F0E2),
+    goldText = NumioBrand.AMBER_TEXT,
+    sketchbook = true,
 )
 
 private val PaperDark = NumioColors(
@@ -62,7 +82,12 @@ val SolColors = NumioColors(
     sketch = false,
 )
 
-fun paperColors(dark: Boolean) = if (dark) PaperDark else PaperLight
+/** Ink's paper. The sketchbook page is always light; the older dark paper is kept for reference. */
+@Suppress("UNUSED_PARAMETER")
+fun paperColors(dark: Boolean) = PaperLight
+
+/** Kept so the earlier dark Ink paper stays recoverable. */
+internal val InkDarkPaper get() = PaperDark
 
 fun homeColors(bg: Background, dark: Boolean) =
     if (bg == Background.Wallpaper) OnWallpaper else paperColors(dark)

@@ -317,6 +317,14 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
             .flowOn(Dispatchers.Default)
             .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
+    /** Ink: the quote under the date. */
+    val inkQuote: StateFlow<com.rr.numio.launcher.data.InkQuote> =
+        prefs.inkQuote.stateIn(viewModelScope, SharingStarted.Eagerly, com.rr.numio.launcher.data.InkQuote())
+
+    fun setInkQuote(q: com.rr.numio.launcher.data.InkQuote) {
+        viewModelScope.launch { prefs.setInkQuote(q) }
+    }
+
     /** Ink: pick an app's sketch icon by hand (a [SketchKind] name or [SketchChoices.OWN]); null = automatic. */
     fun setSketchIcon(entry: AppEntry, choice: String?) {
         viewModelScope.launch { prefs.setSketchChoice(entry.key, choice) }

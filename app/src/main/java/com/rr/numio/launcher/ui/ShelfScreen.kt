@@ -157,27 +157,40 @@ fun ShelfScreen(vm: LauncherViewModel, mode: ShelfMode, modifier: Modifier = Mod
         }
     }
 
+    // Ink on paper: the drawer is the next page of the sketchbook
+    val page = colors.sketchbook
+    Box(modifier.fillMaxSize().pageEdgeShadow(page)) {
     Column(
-        modifier
+        Modifier
             .fillMaxSize()
-            .background(colors.background)
+            .sketchbookPaper(colors)
             .statusBarsPadding()
             .windowInsetsPadding(WindowInsets.navigationBars.union(WindowInsets.ime)),
     ) {
-        // Grab handle: drag down here to close
-        Box(
+        // Grab handle (the sketchbook page: its heading): drag down here to close
+        val dragToClose = Modifier.pointerInput(Unit) {
+            var dragged = 0f
+            detectVerticalDragGestures(
+                onDragStart = { dragged = 0f },
+                onDragEnd = { if (dragged > closeDistance / 2) close() },
+                onVerticalDrag = { _, dy -> dragged += dy },
+            )
+        }
+        if (page) {
+            AllAppsHeader(
+                colors,
+                onSearch = {
+                    focus.requestFocus()
+                    keyboard?.show()
+                },
+                modifier = dragToClose,
+            )
+        } else Box(
             contentAlignment = Alignment.Center,
             modifier = Modifier
                 .fillMaxWidth()
                 .height(28.dp)
-                .pointerInput(Unit) {
-                    var dragged = 0f
-                    detectVerticalDragGestures(
-                        onDragStart = { dragged = 0f },
-                        onDragEnd = { if (dragged > closeDistance / 2) close() },
-                        onVerticalDrag = { _, dy -> dragged += dy },
-                    )
-                },
+                .then(dragToClose),
         ) {
             if (colors.sketch) {
                 Box(
@@ -233,6 +246,9 @@ fun ShelfScreen(vm: LauncherViewModel, mode: ShelfMode, modifier: Modifier = Mod
             onGo = { results.firstOrNull()?.let { vm.launch(it, null, null) } },
         )
     }
+    // the page's curled corner, top right (decoration only)
+    if (page) PageCurlCorner(84.dp, Modifier.align(Alignment.TopEnd))
+    }
 }
 
 @Composable
@@ -265,9 +281,9 @@ private fun SectionHeader(header: ShelfItem.Header, colors: NumioColors) {
                 Spacer(Modifier.width(10.dp))
                 val upper = title.uppercase()
                 if (colors.sketch && upper.all { it == ' ' || SketchInk.hasGlyph(it) }) {
-                    SketchText(upper, 18.dp, colors.gold)
+                    SketchText(upper, 18.dp, colors.goldText)
                 } else {
-                    Text(title, style = TextStyle(color = colors.gold, fontSize = 18.sp))
+                    Text(title, style = TextStyle(color = colors.goldText, fontSize = 18.sp))
                 }
             }
         } else if (title == "#" || !colors.sketch) {
@@ -275,13 +291,13 @@ private fun SectionHeader(header: ShelfItem.Header, colors: NumioColors) {
             Text(
                 title,
                 style = TextStyle(
-                    color = if (colors.sketch) colors.gold else colors.inkSoft,
+                    color = if (colors.sketch) colors.goldText else colors.inkSoft,
                     fontSize = if (colors.sketch) 20.sp else 15.sp,
                     fontWeight = if (colors.sketch) null else FontWeight.SemiBold,
                 ),
             )
         } else {
-            SketchText(title, 20.dp, colors.gold)
+            SketchText(title, 20.dp, colors.goldText)
         }
     }
 }

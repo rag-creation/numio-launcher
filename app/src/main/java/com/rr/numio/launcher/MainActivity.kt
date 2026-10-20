@@ -22,6 +22,8 @@ import androidx.activity.viewModels
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.FastOutLinearInEasing
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -91,13 +93,13 @@ class MainActivity : ComponentActivity() {
         val shelf by vm.shelf.collectAsStateWithLifecycle()
         val dark = isSystemInDarkTheme()
         val sol = theme == HomeTheme.Sol
-        // Sol is always light, to sit on its cream wallpaper; Ink follows the system
+        // Sol is always light, to sit on its cream wallpaper; Ink is a sketchbook page, light too
         val home = if (sol) SolColors else homeColors(bg, dark)
         val paper = if (sol) SolColors else paperColors(dark)
 
-        // Dark status bar icons only on light paper
+        // Dark status bar icons on paper; light ones only over the user's wallpaper
         val shelfOpen = shelf != ShelfMode.Closed
-        val lightBars = sol || (!dark && (shelfOpen || bg == Background.Paper))
+        val lightBars = sol || shelfOpen || bg == Background.Paper
         SideEffect {
             WindowCompat.getInsetsController(window, window.decorView).run {
                 isAppearanceLightStatusBars = lightBars
@@ -105,7 +107,7 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-        NumioTheme(home, paper, dark && !sol) {
+        NumioTheme(home, paper, dark = false) {
             LauncherRoot(vm, shelf, theme)
         }
     }
@@ -120,6 +122,7 @@ class MainActivity : ComponentActivity() {
         val portalSettings by vm.portalSettingsOpen.collectAsStateWithLifecycle()
         val picker by vm.pickerOpen.collectAsStateWithLifecycle()
         val open = shelf != ShelfMode.Closed || workspace || selected
+        val bgIsPaper = vm.background.collectAsStateWithLifecycle().value == Background.Paper
         // Canvas steps back a little as the Shelf comes up, so they feel like one space
         val canvasScale by animateFloatAsState(if (open) 0.94f else 1f, tween(260), label = "canvasScale")
         val canvasAlpha by animateFloatAsState(if (open) 0f else 1f, tween(220), label = "canvasAlpha")
@@ -158,10 +161,15 @@ class MainActivity : ComponentActivity() {
                     )
                 }
             }
+            // The Shelf. Ink: the next sketchbook page slides up over the home page (quick, 2D).
+            // Sol keeps its short rise and fade.
+            val ink = theme == HomeTheme.Ink && bgIsPaper
             AnimatedVisibility(
                 visible = open,
-                enter = slideInVertically(tween(260)) { it / 8 } + fadeIn(tween(200)),
-                exit = slideOutVertically(tween(220)) { it / 8 } + fadeOut(tween(180)),
+                enter = if (ink) slideInVertically(tween(300, easing = FastOutSlowInEasing)) { it }
+                else slideInVertically(tween(260)) { it / 8 } + fadeIn(tween(200)),
+                exit = if (ink) slideOutVertically(tween(240, easing = FastOutLinearInEasing)) { it }
+                else slideOutVertically(tween(220)) { it / 8 } + fadeOut(tween(180)),
             ) {
                 ShelfScreen(vm, shelf)
             }

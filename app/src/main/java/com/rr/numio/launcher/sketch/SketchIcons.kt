@@ -33,9 +33,10 @@ import kotlinx.coroutines.withContext
  */
 object SketchIcons {
 
-    const val PAPER = 0xFFF6ECD6.toInt()
+    /** The icon's circle is the page itself, so icons read as ink circles drawn on the paper. */
+    const val PAPER = 0xFFEFE6D3.toInt()
     const val INK = 0xFF1C1A17.toInt()
-    const val GOLD = 0xFFB8892B.toInt()
+    const val GOLD = 0xFFE9A800.toInt()
 
     private val cache = object : LruCache<String, ImageBitmap>(48 * 1024 * 1024) {
         override fun sizeOf(key: String, value: ImageBitmap) = value.width * value.height * 4

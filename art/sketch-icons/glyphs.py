@@ -362,8 +362,8 @@ def fit_all():
         GLYPHS[name] = out
 
 
-COLOURS = {"INK": 0xFF1C1A17, "CREAM": 0xFFFFF9EE, "GOLD": 0xFFC9962E}
-PAPER = 0xFFF6ECD6
+COLOURS = {"INK": 0xFF1C1A17, "CREAM": 0xFFFFF9EE, "GOLD": 0xFFE9A800}
+PAPER = 0xFFEFE6D3
 
 
 KT_NAMES = {"alarmclock": "AlarmClock", "pocketwatch": "PocketWatch", "deskcalendar": "DeskCalendar"}

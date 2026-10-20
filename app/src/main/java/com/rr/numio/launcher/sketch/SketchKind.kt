@@ -61,7 +61,7 @@ enum class SketchKind(
 enum class Tone(val argb: Int) {
     INK(0xFF1C1A17.toInt()),
     CREAM(0xFFFFF9EE.toInt()),
-    GOLD(0xFFC9962E.toInt()),
+    GOLD(0xFFE9A800.toInt()),   // Numio amber on paper
 }
 
 /** One drawing step of a glyph, in the 100-unit grid. Paths use M, L, C and Z. */

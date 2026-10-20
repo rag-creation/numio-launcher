@@ -103,13 +103,21 @@ fun CanvasScreen(
     val showCalendar by vm.showCalendar.collectAsStateWithLifecycle()
     val hasWork by vm.hasWorkProfile.collectAsStateWithLifecycle()
     val portal by vm.portal.collectAsStateWithLifecycle()
+    val quote by vm.inkQuote.collectAsStateWithLifecycle()
+    var editQuote by remember { mutableStateOf(false) }
     val swipe = with(LocalDensity.current) { 56.dp.toPx() }
     val now = rememberNow()
+    // Ink on paper is a sketchbook page; on the wallpaper it keeps its clean look
+    val page = colors.sketchbook
+
+    if (editQuote) {
+        QuoteDialog(quote, onSave = { vm.setInkQuote(it); editQuote = false }, onDismiss = { editQuote = false })
+    }
 
     Box(
         modifier
             .fillMaxSize()
-            .background(colors.background)
+            .sketchbookPaper(colors)
             // Swipe up anywhere opens the Shelf
             .pointerInput(Unit) {
                 var dragged = 0f
@@ -127,10 +135,16 @@ fun CanvasScreen(
                 .navigationBarsPadding()
                 .padding(horizontal = 24.dp),
         ) {
-            // The clock sits about a third of the way into the free space, not under the status bar
-            Spacer(Modifier.weight(0.34f))
+            // The clock sits about a third of the way into the free space, not under the status bar.
+            // On the sketchbook page it starts near the top, below the logo, to leave room for the drawing.
+            if (page) Spacer(Modifier.height(72.dp)) else Spacer(Modifier.weight(0.34f))
 
             ClockBlock(colors, now, showCalendar, onOpenClock, onOpenEvent)
+
+            if (page && quote.visible) {
+                Spacer(Modifier.height(14.dp))
+                InkQuoteText(quote, colors, Modifier.padding(start = 6.dp))
+            }
 
             if (!isDefault) {
                 Spacer(Modifier.height(24.dp))
@@ -150,6 +164,8 @@ fun CanvasScreen(
                 portalVisible = portal.visible,
                 onRequestHome = onRequestHome,
                 onLauncherInfo = onOpenLauncherInfo,
+                onEditQuote = if (page) ({ editQuote = true }) else null,
+                landscape = page,
                 modifier = Modifier.weight(1f).fillMaxWidth(),
             )
 
@@ -409,6 +425,8 @@ private fun CanvasMenuArea(
     portalVisible: Boolean,
     onRequestHome: () -> Unit,
     onLauncherInfo: () -> Unit,
+    onEditQuote: (() -> Unit)?,
+    landscape: Boolean,
     modifier: Modifier,
 ) {
     val haptics = LocalHapticFeedback.current
@@ -423,6 +441,8 @@ private fun CanvasMenuArea(
             })
         }
     ) {
+        // The page's drawing fills the open space; long-press still opens the menu over it
+        if (landscape) InkLandscape(Modifier.fillMaxSize().padding(top = 8.dp, bottom = 14.dp))
         val at = menuAt
         Box(
             Modifier.offset(
@@ -448,6 +468,9 @@ private fun CanvasMenuArea(
                     text = { Text(tick(showCalendar, "Show next calendar event")) },
                     onClick = { menuAt = null; onToggleCalendar() },
                 )
+                if (onEditQuote != null) {
+                    DropdownMenuItem(text = { Text("Quote…") }, onClick = { menuAt = null; onEditQuote() })
+                }
                 DropdownMenuItem(
                     text = { Text(if (portalVisible) "Numio logo…" else "Numio logo… (hidden)") },
                     onClick = { menuAt = null; onPortalSettings() },
@@ -479,11 +502,13 @@ private fun Dock(vm: LauncherViewModel, colors: NumioColors, dock: List<AppEntry
         modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
     ) {
         dock.forEach { entry ->
+            // On the sketchbook page the dock is labelled, like a page of notes
             AppTile(
                 entry, vm, colors,
                 iconSize = 50.dp,
-                showLabel = false,
-                modifier = Modifier.width(62.dp),
+                showLabel = colors.sketchbook,
+                // labelled: share the width evenly, so five fit on any phone
+                modifier = if (colors.sketchbook) Modifier.weight(1f) else Modifier.width(62.dp),
             )
         }
     }

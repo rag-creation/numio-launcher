@@ -83,6 +83,18 @@ class HomePrefs(context: Context) {
         }
     }
 
+    /** Ink's quote under the date: shown by default, with the default words. */
+    val inkQuote: Flow<InkQuote> = store.data.map { p ->
+        InkQuote(text = p[INK_QUOTE] ?: InkQuote.DEFAULT, visible = p[INK_QUOTE_ON] ?: true)
+    }
+
+    suspend fun setInkQuote(q: InkQuote) {
+        store.edit {
+            it[INK_QUOTE] = InkQuote.clean(q.text)
+            it[INK_QUOTE_ON] = q.visible
+        }
+    }
+
     /** Sol's home grid (see [HomeGrid.serialize]); null until it's first changed. */
     val solGrid: Flow<String?> = store.data.map { p -> p[SOL_GRID] }
 
@@ -162,5 +174,7 @@ class HomePrefs(context: Context) {
         private val PORTAL_APPS = stringPreferencesKey("portal_apps")
         private val PORTAL_STYLE = stringPreferencesKey("portal_style")
         private val SKETCH_ICONS = stringPreferencesKey("sketch_icons")
+        private val INK_QUOTE = stringPreferencesKey("ink_quote")
+        private val INK_QUOTE_ON = booleanPreferencesKey("ink_quote_on")
     }
 }
