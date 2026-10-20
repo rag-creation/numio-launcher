@@ -134,11 +134,11 @@ class SketchRolesTest {
     }
 
     @Test fun everyVisibleAssistantAppGetsInkOrbit() {
-        val shown = mapOf("com.anthropic.claude" to "Claude", "com.openai.chatgpt" to "ChatGPT")
-        val handlers = listOf(h("com.anthropic.claude", false), h("com.openai.chatgpt", false), h("com.hidden.assistant", true))
+        val shown = mapOf("com.example.assistant" to "Assistant", "com.example.chat" to "Chat")
+        val handlers = listOf(h("com.example.assistant", false), h("com.example.chat", false), h("com.hidden.assistant", true))
         // all that declare it and are in the app list; a hidden one and the chooser never
         assertEquals(
-            setOf("com.anthropic.claude", "com.openai.chatgpt"),
+            setOf("com.example.assistant", "com.example.chat"),
             SketchRoles.choose(SketchKind.Assistant, listOf("android"), handlers, shown),
         )
         // nothing declared: nothing gets it (no guessing by name)

@@ -416,7 +416,7 @@ private fun HomeBanner(colors: NumioColors, onClick: () -> Unit) {
             style = TextStyle(color = colors.ink, fontSize = 15.sp),
             modifier = Modifier.weight(1f),
         )
-        Text("Set", style = TextStyle(color = colors.gold, fontSize = 15.sp))
+        Text("Set", style = TextStyle(color = colors.goldText, fontSize = 15.sp))
     }
 }
 
