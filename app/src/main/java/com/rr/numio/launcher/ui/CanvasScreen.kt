@@ -26,6 +26,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.DropdownMenu
@@ -108,6 +109,7 @@ fun CanvasScreen(
     val appearance by vm.inkAppearance.collectAsStateWithLifecycle()
     val warmPaper by vm.inkWarmPaper.collectAsStateWithLifecycle()
     var editAppearance by remember { mutableStateOf(false) }
+    val showStatusBar by vm.inkStatusBar.collectAsStateWithLifecycle()
     val swipe = with(LocalDensity.current) { 56.dp.toPx() }
     val now = rememberNow()
     // Ink on paper is a sketchbook page; on the wallpaper it keeps its clean look
@@ -138,7 +140,7 @@ fun CanvasScreen(
         Column(
             Modifier
                 .fillMaxSize()
-                .statusBarsPadding()
+                .windowInsetsPadding(inkTopInsets())
                 .navigationBarsPadding()
                 .padding(horizontal = 24.dp),
         ) {
@@ -173,6 +175,8 @@ fun CanvasScreen(
                 onLauncherInfo = onOpenLauncherInfo,
                 onEditQuote = if (page) ({ editQuote = true }) else null,
                 onAppearance = { editAppearance = true },
+                showStatusBar = showStatusBar,
+                onToggleStatusBar = { vm.setInkStatusBar(!showStatusBar) },
                 landscape = page,
                 modifier = Modifier.weight(1f).fillMaxWidth(),
             )
@@ -194,7 +198,7 @@ fun CanvasScreen(
                 style = portal.style,
                 modifier = Modifier
                     .align(Alignment.TopEnd)
-                    .statusBarsPadding()
+                    .windowInsetsPadding(inkTopInsets())
                     .padding(top = 16.dp, end = 16.dp),
             )
         }
@@ -435,6 +439,8 @@ private fun CanvasMenuArea(
     onLauncherInfo: () -> Unit,
     onEditQuote: (() -> Unit)?,
     onAppearance: () -> Unit,
+    showStatusBar: Boolean,
+    onToggleStatusBar: () -> Unit,
     landscape: Boolean,
     modifier: Modifier,
 ) {
@@ -478,6 +484,10 @@ private fun CanvasMenuArea(
                     onClick = { menuAt = null; onToggleCalendar() },
                 )
                 DropdownMenuItem(text = { Text("Ink appearance…") }, onClick = { menuAt = null; onAppearance() })
+                DropdownMenuItem(
+                    text = { Text(tick(showStatusBar, "Show status bar")) },
+                    onClick = { menuAt = null; onToggleStatusBar() },
+                )
                 if (onEditQuote != null) {
                     DropdownMenuItem(text = { Text("Quote…") }, onClick = { menuAt = null; onEditQuote() })
                 }

@@ -119,6 +119,13 @@ class HomePrefs(context: Context) {
         store.edit { it[INK_WARM_PAPER] = warm }
     }
 
+    /** Ink: show the Android status bar (default) or hide it for a full-page sketchbook. */
+    val inkStatusBar: Flow<Boolean> = store.data.map { p -> p[INK_STATUS_BAR] ?: true }
+
+    suspend fun setInkStatusBar(show: Boolean) {
+        store.edit { it[INK_STATUS_BAR] = show }
+    }
+
     /** Ink's quote under the date: shown by default, with the default words. */
     val inkQuote: Flow<InkQuote> = store.data.map { p ->
         InkQuote(text = p[INK_QUOTE] ?: InkQuote.DEFAULT, visible = p[INK_QUOTE_ON] ?: true)
@@ -214,5 +221,6 @@ class HomePrefs(context: Context) {
         private val INK_QUOTE_ON = booleanPreferencesKey("ink_quote_on")
         private val INK_APPEARANCE = stringPreferencesKey("ink_appearance")
         private val INK_WARM_PAPER = booleanPreferencesKey("ink_warm_paper")
+        private val INK_STATUS_BAR = booleanPreferencesKey("ink_status_bar")
     }
 }

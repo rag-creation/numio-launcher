@@ -5,6 +5,12 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.displayCutout
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -76,6 +82,15 @@ import kotlin.random.Random
  * and its curled corner. Used only when the colours say [NumioColors.sketchbook] (Ink on
  * paper); Sol and Ink-on-wallpaper never see any of it.
  */
+
+/**
+ * The space Ink keeps clear at the top: the status bar when it shows, and the camera cut-out
+ * (and other top safe areas) always, so the clock and logo never sit under hardware when the
+ * status bar is hidden and the page runs to the top edge.
+ */
+@Composable
+fun inkTopInsets(): WindowInsets =
+    WindowInsets.statusBars.union(WindowInsets.displayCutout.only(WindowInsetsSides.Top))
 
 /** The page: its colour plus a repeated tile of faint grain and fibres. */
 @Composable

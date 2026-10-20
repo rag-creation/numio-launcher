@@ -330,6 +330,13 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch { prefs.setInkWarmPaper(warm) }
     }
 
+    /** Ink: show (default) or hide the Android status bar. */
+    val inkStatusBar: StateFlow<Boolean> = prefs.inkStatusBar.stateIn(viewModelScope, SharingStarted.Eagerly, true)
+
+    fun setInkStatusBar(show: Boolean) {
+        viewModelScope.launch { prefs.setInkStatusBar(show) }
+    }
+
     /** Ink: the quote under the date. */
     val inkQuote: StateFlow<com.rr.numio.launcher.data.InkQuote> =
         prefs.inkQuote.stateIn(viewModelScope, SharingStarted.Eagerly, com.rr.numio.launcher.data.InkQuote())

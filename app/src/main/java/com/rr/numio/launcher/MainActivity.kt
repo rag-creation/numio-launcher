@@ -37,7 +37,11 @@ import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
+import android.view.WindowManager
 import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
+import com.rr.numio.launcher.data.StatusBarRule
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.rr.numio.launcher.data.Background
 import com.rr.numio.launcher.data.HomeTheme
@@ -80,6 +84,12 @@ class MainActivity : ComponentActivity() {
             navigationBarStyle = SystemBarStyle.auto(Color.TRANSPARENT, Color.TRANSPARENT),
         )
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) window.isNavigationBarContrastEnforced = false
+        // The page may run up into the camera cut-out area; content keeps clear of it (see inkTopInsets)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            window.attributes.layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
+        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            window.attributes.layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+        }
 
         setContent {
             // Nothing until the saved theme is known (a few ms at cold start), so Ink never flashes before Sol
@@ -108,11 +118,16 @@ class MainActivity : ComponentActivity() {
         val selectedOpen by vm.selectedOpen.collectAsStateWithLifecycle()
         val onPaper = shelf != ShelfMode.Closed || workspaceOpen || selectedOpen || bg == Background.Paper
         val lightBars = sol || (!inkDark && onPaper)
+        // Ink can hide the status bar (only the status bar); Sol, Workspace and Selected apps keep it
+        val showStatusBar by vm.inkStatusBar.collectAsStateWithLifecycle()
+        val hideStatus = StatusBarRule.hide(theme, showStatusBar, workspaceOpen, selectedOpen)
         SideEffect {
             WindowCompat.getInsetsController(window, window.decorView).run {
                 isAppearanceLightStatusBars = lightBars
                 isAppearanceLightNavigationBars = lightBars
             }
+            statusHidden = hideStatus
+            applyStatusBar()
         }
 
         NumioTheme(home, paper, dark = inkDark && !sol) {
@@ -212,6 +227,27 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         vm.refreshDefaultHome()
+        applyStatusBar()
+    }
+
+    /** Whether the status bar should be hidden now (set from the theme and the setting). */
+    private var statusHidden = false
+
+    /**
+     * Hides or shows only the status bar. Android can bring it back when we return from an app
+     * or a dialog, so this is applied again whenever the launcher regains focus. A swipe down
+     * from the top still shows it for a moment.
+     */
+    private fun applyStatusBar() {
+        WindowCompat.getInsetsController(window, window.decorView).run {
+            systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            if (statusHidden) hide(WindowInsetsCompat.Type.statusBars()) else show(WindowInsetsCompat.Type.statusBars())
+        }
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus) applyStatusBar()
     }
 
     override fun onStop() {

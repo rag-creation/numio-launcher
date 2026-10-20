@@ -164,7 +164,8 @@ fun ShelfScreen(vm: LauncherViewModel, mode: ShelfMode, modifier: Modifier = Mod
         Modifier
             .fillMaxSize()
             .sketchbookPaper(colors)
-            .statusBarsPadding()
+            // Ink keeps clear of the camera cut-out too (its status bar can be hidden); Sol as before
+            .then(if (colors.sketch) Modifier.windowInsetsPadding(inkTopInsets()) else Modifier.statusBarsPadding())
             .windowInsetsPadding(WindowInsets.navigationBars.union(WindowInsets.ime)),
     ) {
         // Grab handle (the sketchbook page: its heading): drag down here to close
