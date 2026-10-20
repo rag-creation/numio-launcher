@@ -153,6 +153,21 @@ class HomePrefs(context: Context) {
         }
     }
 
+    /** Ink's home page (see [InkPage.serialize]); null until an app is first put on it. Separate from Sol's. */
+    val inkPage: Flow<String?> = store.data.map { p -> p[INK_PAGE] }
+
+    suspend fun setInkPage(text: String) {
+        store.edit { it[INK_PAGE] = text }
+    }
+
+    /** Ink's page and the dock in one save, so a move between them is never half done. */
+    suspend fun setInkPageAndDock(page: String, dock: List<String?>) {
+        store.edit {
+            it[INK_PAGE] = page
+            it[DOCK] = dock.joinToString("\n") { k -> k.orEmpty() }
+        }
+    }
+
     /** Home and dock in one save, so a move between them is never half done. */
     suspend fun setCells(home: List<String?>, dock: List<String?>) {
         store.edit {
@@ -222,5 +237,6 @@ class HomePrefs(context: Context) {
         private val INK_APPEARANCE = stringPreferencesKey("ink_appearance")
         private val INK_WARM_PAPER = booleanPreferencesKey("ink_warm_paper")
         private val INK_STATUS_BAR = booleanPreferencesKey("ink_status_bar")
+        private val INK_PAGE = stringPreferencesKey("ink_page")
     }
 }

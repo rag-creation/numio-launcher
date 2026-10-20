@@ -11,6 +11,7 @@ import com.rr.numio.launcher.data.Cells
 import com.rr.numio.launcher.data.DefaultDock
 import com.rr.numio.launcher.data.GridItem
 import com.rr.numio.launcher.data.HomeGrid
+import com.rr.numio.launcher.data.InkPage
 import com.rr.numio.launcher.data.Profiles
 import com.rr.numio.launcher.data.PortalRules
 import com.rr.numio.launcher.data.PortalColor
@@ -279,6 +280,55 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
 
     fun removeFromHome(entry: AppEntry) {
         saveGrid(gridItems.value.filter { it.id != entry.key })
+    }
+
+    // ── Ink's page: apps anywhere over the sketchbook page (its own save, not Sol's) ──
+
+    /** Rows Ink's page has on this screen; set by the screen once it's measured. */
+    private val inkRows = MutableStateFlow(4)
+
+    fun setInkRows(rows: Int) {
+        inkRows.value = rows
+    }
+
+    private val inkSaved: StateFlow<List<GridItem>> =
+        prefs.inkPage.map { InkPage.parse(it) }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
+    /** The apps on Ink's page, as shown on this screen (see [InkPage.layout]). */
+    val inkPage: StateFlow<List<GridItem>> =
+        combine(appsByKey, inkSaved, inkRows) { apps, saved, rows -> InkPage.layout(saved, rows, apps.keys) }
+            .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
+    private fun inkToSave(next: List<GridItem>) =
+        InkPage.serialize(InkPage.keepUnshown(next, inkSaved.value, inkPage.value))
+
+    fun isOnInkPage(entry: AppEntry) = inkSaved.value.any { it.id == entry.key }
+
+    fun addToInkPage(entry: AppEntry) {
+        val items = inkPage.value
+        if (isOnInkPage(entry)) return
+        val spot = InkPage.firstFree(items, inkRows.value)
+        if (spot == null) {
+            Toast.makeText(getApplication(), "The page is full. Remove an app first", Toast.LENGTH_SHORT).show()
+            return
+        }
+        val next = inkToSave(items + GridItem(entry.key, spot.first, spot.second, 1, 1))
+        viewModelScope.launch { prefs.setInkPage(next) }
+    }
+
+    fun removeFromInkPage(entry: AppEntry) {
+        val next = InkPage.serialize(inkSaved.value.filter { it.id != entry.key })
+        viewModelScope.launch { prefs.setInkPage(next) }
+    }
+
+    fun inkCanDrop(from: Slot, to: Slot): Boolean =
+        InkPage.move(inkPage.value, keys(dockCells.value), inkRows.value, from, to) != null
+
+    /** Drag on Ink's page or dock: apps move into empty cells or swap, page ↔ dock too. */
+    fun inkDrop(from: Slot, to: Slot) {
+        val (page, dock) = InkPage.move(inkPage.value, keys(dockCells.value), inkRows.value, from, to) ?: return
+        val text = inkToSave(page)
+        viewModelScope.launch { prefs.setInkPageAndDock(text, dock) }
     }
 
     /** Can [from] be dropped on [to]? Used while dragging, to show only real drop spots. */

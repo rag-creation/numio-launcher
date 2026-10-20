@@ -205,6 +205,16 @@ fun AppTile(
                         if (onHome) vm.removeFromHome(entry) else vm.addToHome(entry)
                     },
                 )
+            } else {
+                // Ink's page has its own places, separate from Sol's
+                val onPage = vm.isOnInkPage(entry)
+                DropdownMenuItem(
+                    text = { Text(if (onPage) "Remove from home" else "Add to home") },
+                    onClick = {
+                        menu = false
+                        if (onPage) vm.removeFromInkPage(entry) else vm.addToInkPage(entry)
+                    },
+                )
             }
             val inDock = vm.isInDock(entry)
             DropdownMenuItem(

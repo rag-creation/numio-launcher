@@ -33,6 +33,16 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.key
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.zIndex
+import com.rr.numio.launcher.data.GridItem
+import com.rr.numio.launcher.data.InkPage
+import com.rr.numio.launcher.data.Slot
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -98,7 +108,11 @@ fun CanvasScreen(
     modifier: Modifier = Modifier,
 ) {
     val colors = LocalHome.current
-    val dock by vm.dock.collectAsStateWithLifecycle()
+    val dockCells by vm.dockCells.collectAsStateWithLifecycle()
+    val pageApps by vm.inkPage.collectAsStateWithLifecycle()
+    val apps by vm.appsByKey.collectAsStateWithLifecycle()
+    // Hold an app on the page or in the dock, then move it: drops on any free cell or swaps
+    val placement = rememberPlacement(vm::inkDrop, vm::inkCanDrop)
     val isDefault by vm.isDefaultHome.collectAsStateWithLifecycle()
     val bg by vm.background.collectAsStateWithLifecycle()
     val showCalendar by vm.showCalendar.collectAsStateWithLifecycle()
@@ -179,9 +193,11 @@ fun CanvasScreen(
                 onToggleStatusBar = { vm.setInkStatusBar(!showStatusBar) },
                 landscape = page,
                 modifier = Modifier.weight(1f).fillMaxWidth(),
-            )
+            ) { openMenu ->
+                InkPageGrid(vm, colors, pageApps, apps, placement, openMenu)
+            }
 
-            Dock(vm, colors, dock)
+            Dock(vm, colors, dockCells, placement)
             Spacer(Modifier.height(20.dp))
             SearchPill(colors) { vm.openShelf(ShelfMode.Search) }
             Spacer(Modifier.height(16.dp))
@@ -443,21 +459,18 @@ private fun CanvasMenuArea(
     onToggleStatusBar: () -> Unit,
     landscape: Boolean,
     modifier: Modifier,
+    /** The page's apps, drawn over the drawing. Its empty cells call openMenu on long-press. */
+    grid: @Composable (openMenu: (Offset) -> Unit) -> Unit,
 ) {
-    val haptics = LocalHapticFeedback.current
     val density = LocalDensity.current
     var menuAt by remember { mutableStateOf<Offset?>(null) }
 
-    Box(
-        modifier.pointerInput(Unit) {
-            detectTapGestures(onLongPress = {
-                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                menuAt = it
-            })
-        }
-    ) {
-        // The page's drawing fills the open space; long-press still opens the menu over it
+    Box(modifier) {
+        // The page's drawing fills the open space, behind the apps (decoration only, never touched)
         if (landscape) InkLandscape(colors.icons, Modifier.fillMaxSize().padding(top = 8.dp, bottom = 14.dp))
+        // The grid covers the whole area: long-press on an empty spot opens the home menu,
+        // long-press on an app is the app's own (hold and move to drag it)
+        grid { menuAt = it }
         val at = menuAt
         Box(
             Modifier.offset(
@@ -506,8 +519,11 @@ private fun CanvasMenuArea(
 }
 
 @Composable
-private fun Dock(vm: LauncherViewModel, colors: NumioColors, dock: List<AppEntry>) {
-    if (dock.isEmpty()) {
+private fun Dock(vm: LauncherViewModel, colors: NumioColors, cells: List<AppEntry?>, placement: Placement) {
+    // A free dock cell, offered only while a page app is being dragged (the dock packs its apps)
+    val free = cells.indexOfFirst { it == null }
+    val offerFree = free >= 0 && placement.dragging?.area == Slot.HOME
+    if (cells.all { it == null } && !offerFree) {
         Text(
             "Long-press an app in the Shelf to add it here",
             style = TextStyle(color = colors.inkSoft, fontSize = 13.sp),
@@ -521,15 +537,124 @@ private fun Dock(vm: LauncherViewModel, colors: NumioColors, dock: List<AppEntry
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
     ) {
-        dock.forEach { entry ->
-            // On the sketchbook page the dock is labelled, like a page of notes
-            AppTile(
-                entry, vm, colors,
-                iconSize = 50.dp,
-                showLabel = colors.sketchbook,
-                // labelled: share the width evenly, so five fit on any phone
-                modifier = if (colors.sketchbook) Modifier.weight(1f) else Modifier.width(62.dp),
+        // labelled: share the width evenly, so five fit on any phone
+        val cell = if (colors.sketchbook) Modifier.weight(1f) else Modifier.width(62.dp)
+        cells.forEachIndexed { i, entry ->
+            if (entry != null) {
+                key(entry.key) {
+                    // On the sketchbook page the dock is labelled, like a page of notes
+                    AppTile(
+                        entry, vm, colors,
+                        iconSize = 50.dp,
+                        showLabel = colors.sketchbook,
+                        modifier = cell,
+                        placement = placement,
+                        slot = Slot(Slot.DOCK, i),
+                    )
+                }
+            }
+        }
+        if (offerFree) {
+            val slot = Slot(Slot.DOCK, free)
+            DisposableEffect(slot) { onDispose { placement.slots.remove(slot) } }
+            Box(cell.height(if (colors.sketchbook) 80.dp else 62.dp).dropCell(placement, slot), contentAlignment = Alignment.Center) {
+                DropRing(colors, placement.isTarget(slot))
+            }
+        }
+    }
+}
+
+/** A free spot an app can be dropped on: a faint pencil circle, amber when the app is over it. */
+@Composable
+private fun DropRing(colors: NumioColors, active: Boolean) {
+    Box(
+        Modifier
+            .size(56.dp)
+            .sketchBorder(
+                if (active) colors.gold else colors.inkSoft.copy(alpha = 0.35f),
+                28.dp, seed = 7, width = if (active) 2.dp else 1.dp,
             )
+    )
+}
+
+/**
+ * Ink's page: [InkPage.COLS] columns and as many rows as fit the open space under the clock,
+ * drawn over the sketchbook drawing. Apps sit in their cells; hold one and move it to place
+ * it anywhere (or into the dock). Empty cells take drops and open the home menu on long-press.
+ */
+@Composable
+private fun InkPageGrid(
+    vm: LauncherViewModel,
+    colors: NumioColors,
+    items: List<GridItem>,
+    apps: Map<String, AppEntry>,
+    placement: Placement,
+    openMenu: (Offset) -> Unit,
+) {
+    val haptics = LocalHapticFeedback.current
+    val cols = InkPage.COLS
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        val rows = (maxHeight / 92.dp).toInt().coerceIn(1, 8)
+        LaunchedEffect(rows) { vm.setInkRows(rows) }
+        val cellW = maxWidth / cols
+        val cellH = maxHeight / rows
+        val dragging = placement.dragging
+        Box(
+            Modifier
+                .fillMaxSize()
+                // the page reports every cell's place on screen, filled or not
+                .onGloballyPositioned { coords ->
+                    val o = coords.boundsInWindow().topLeft
+                    val cw = coords.size.width / cols.toFloat()
+                    val ch = coords.size.height / rows.toFloat()
+                    placement.slots.keys.removeAll { it.area == Slot.HOME }
+                    for (r in 0 until rows) for (c in 0 until cols) {
+                        placement.slots[Slot(Slot.HOME, r * cols + c)] =
+                            Rect(o.x + c * cw, o.y + r * ch, o.x + (c + 1) * cw, o.y + (r + 1) * ch)
+                    }
+                }
+        ) {
+            // Empty cells: long-press for the home menu; while dragging, a faint ring shows the spot
+            for (r in 0 until rows) for (c in 0 until cols) {
+                if (items.none { it.covers(c, r) }) {
+                    val slot = Slot(Slot.HOME, r * cols + c)
+                    Box(
+                        Modifier
+                            .offset(cellW * c, cellH * r)
+                            .size(cellW, cellH)
+                            .pointerInput(c, r, rows) {
+                                detectTapGestures(onLongPress = { p ->
+                                    haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                                    openMenu(Offset(cellW.toPx() * c + p.x, cellH.toPx() * r + p.y))
+                                })
+                            },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        if (dragging != null && placement.isTarget(slot)) DropRing(colors, true)
+                    }
+                }
+            }
+
+            items.forEach { item ->
+                val entry = apps[item.id] ?: return@forEach
+                key(item.id) {
+                    val slot = Slot(Slot.HOME, item.row * cols + item.col)
+                    Box(
+                        Modifier
+                            .offset(cellW * item.col, cellH * item.row)
+                            .size(cellW, cellH)
+                            .zIndex(if (placement.dragging == slot) 1f else 0f),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        AppTile(
+                            entry, vm, colors, iconSize = 50.dp,
+                            showLabel = colors.sketchbook,
+                            modifier = Modifier.fillMaxWidth(),
+                            placement = placement, slot = slot, registerSlot = false,
+                        )
+                    }
+                }
+            }
         }
     }
 }
