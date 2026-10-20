@@ -4,7 +4,7 @@ import androidx.compose.foundation.Canvas
 import com.rr.numio.launcher.sketch.InkArtwork
 import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.imageResource
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -142,7 +142,7 @@ fun InkLandscape(palette: SketchPalette, modifier: Modifier = Modifier) {
 @Composable
 private fun InkNightScene(modifier: Modifier) {
     Image(
-        painter = painterResource(InkArtwork.NIGHT_RES),
+        bitmap = ImageBitmap.imageResource(InkArtwork.NIGHT_RES),
         contentDescription = null,
         contentScale = ContentScale.Fit,
         alignment = Alignment.BottomCenter,
