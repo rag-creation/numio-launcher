@@ -1,6 +1,10 @@
 package com.rr.numio.launcher.ui
 
 import androidx.compose.foundation.Canvas
+import com.rr.numio.launcher.sketch.InkArtwork
+import androidx.compose.ui.graphics.FilterQuality
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -105,9 +109,17 @@ fun Modifier.sketchbookPaper(colors: NumioColors): Modifier {
     }
 }
 
-/** The original ink landscape, fitted into whatever space it is given (anchored bottom-right). */
+/**
+ * The page's drawing. Light Ink: the original ink landscape, fitted into whatever space it is
+ * given (anchored bottom-right). Dark Ink: its own night scene (see [InkArtwork]).
+ * Decoration only: neither drawing takes touches.
+ */
 @Composable
 fun InkLandscape(palette: SketchPalette, modifier: Modifier = Modifier) {
+    if (InkArtwork.of(palette) == InkArtwork.Night) {
+        InkNightScene(modifier)
+        return
+    }
     val context = LocalContext.current
     BoxWithConstraints(modifier) {
         val w = constraints.maxWidth
@@ -120,6 +132,23 @@ fun InkLandscape(palette: SketchPalette, modifier: Modifier = Modifier) {
         }
         art?.let { Image(it, contentDescription = null, modifier = Modifier.fillMaxSize()) }
     }
+}
+
+/**
+ * Dark Ink's night scene: the approved pen drawing, shown whole (never stretched or cropped),
+ * sitting at the bottom of the space and centred. Its black is transparent, so the dark
+ * page shows through and there is no visible edge.
+ */
+@Composable
+private fun InkNightScene(modifier: Modifier) {
+    Image(
+        painter = painterResource(InkArtwork.NIGHT_RES),
+        contentDescription = null,
+        contentScale = ContentScale.Fit,
+        alignment = Alignment.BottomCenter,
+        filterQuality = FilterQuality.High,
+        modifier = modifier,
+    )
 }
 
 /** The landscapes drawn so far (one per size and palette), so coming home or switching theme back never redraws. */

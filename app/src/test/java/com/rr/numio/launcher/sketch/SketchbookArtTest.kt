@@ -2,6 +2,7 @@ package com.rr.numio.launcher.sketch
 
 import android.content.Context
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
@@ -136,5 +137,75 @@ class SketchbookArtTest {
         val dcurl = PageCurl.render((84 * 2.625f).toInt(), dark = true)
         dc.drawBitmap(dcurl, (w - dcurl.width).toFloat(), 0f, null)
         File(out, "ink-sketchbook-dark.png").outputStream().use { darkPage.compress(Bitmap.CompressFormat.PNG, 100, it) }
+    }
+
+    // ── Light Ink and Dark Ink each keep their own drawing ──────────────────
+
+    @Test fun lightInkLandscapeIsTheOriginalDrawing() {
+        // the exact data the Light Ink landscape is drawn from; any change to it fails here
+        val bytes = context.resources.openRawResource(com.rr.numio.launcher.R.raw.ink_landscape).use { it.readBytes() }
+        val hash = java.security.MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }
+        assertEquals("ab0eee90afd9fc318c5be1b233a180fc207d03f3a023eda9d9ac8d335b6c3196", hash)
+    }
+
+    private fun night(): Bitmap = BitmapFactory.decodeResource(
+        context.resources, InkArtwork.NIGHT_RES, BitmapFactory.Options().apply { inScaled = false },
+    )
+
+    @Test fun darkInkNightSceneIsCreamPenAndGoldOnClearBlack() {
+        val b = night()
+        assertEquals(841, b.width)
+        assertEquals(762, b.height)
+        // the black is transparent, so the dark page shows through with no visible edge
+        for ((x, y) in listOf(0 to 0, b.width - 1 to 0, 0 to b.height - 1, b.width - 1 to b.height - 1)) {
+            assertEquals("corner $x,$y", 0, Color.alpha(b.getPixel(x, y)))
+        }
+        var clear = 0; var cream = 0; var gold = 0
+        for (y in 0 until b.height step 2) for (x in 0 until b.width step 2) {
+            val c = b.getPixel(x, y)
+            if (Color.alpha(c) < 8) { clear++; continue }
+            if (Color.alpha(c) < 160) continue
+            val r = Color.red(c); val g = Color.green(c); val bl = Color.blue(c)
+            if (r > 200 && g > 190 && bl > 160) cream++
+            if (r > 200 && g in 120..200 && bl < 90) gold++
+        }
+        val total = (b.width / 2) * (b.height / 2)
+        // mostly open night: fine lines, not heavy shapes
+        assertTrue("too busy (${clear * 100 / total}% clear)", clear > total * 0.6)
+        assertTrue("no cream linework ($cream)", cream > 1500)
+        assertTrue("no gold moon or reflection ($gold)", gold > 800)
+    }
+
+    @Test fun saveArtworkComparison() {
+        // Light Ink and Dark Ink side by side, each drawing in the space the A73's home gives it
+        val w = 1080; val h = 1200; val gap = 40
+        val sheet = Bitmap.createBitmap(w * 2 + gap, h, Bitmap.Config.ARGB_8888)
+        val c = Canvas(sheet)
+        c.drawColor(0xFF7F7F7F.toInt())
+        val paint = Paint(Paint.FILTER_BITMAP_FLAG)
+
+        fun page(left: Float, colour: Int, dark: Boolean) {
+            c.save(); c.translate(left, 0f); c.clipRect(0, 0, w, h)
+            c.drawColor(colour)
+            val grain = PaperGrain.bitmap(dark = dark)
+            for (y in 0 until h step PaperGrain.SIZE) for (x in 0 until w step PaperGrain.SIZE) c.drawBitmap(grain, x.toFloat(), y.toFloat(), null)
+            c.restore()
+        }
+        page(0f, 0xFFEFE6D3.toInt(), dark = false)
+        c.drawBitmap(LandscapeArt.render(LandscapeArt.marks(context), w - 80, h - 60), 40f, 30f, paint)
+
+        val left = (w + gap).toFloat()
+        page(left, 0xFF0F0F0E.toInt(), dark = true)
+        // fitted whole, bottom-centred, as the home screen draws it
+        val n = night()
+        val boxW = w - 80f; val boxH = h - 60f
+        val s = minOf(boxW / n.width, boxH / n.height)
+        val dw = n.width * s; val dh = n.height * s
+        val dx = left + 40f + (boxW - dw) / 2; val dy = 30f + boxH - dh
+        c.drawBitmap(n, null, android.graphics.RectF(dx, dy, dx + dw, dy + dh), paint)
+
+        val f = File(out, "ink-artwork-light-vs-dark.png")
+        f.outputStream().use { sheet.compress(Bitmap.CompressFormat.PNG, 100, it) }
+        assertTrue(f.length() > 0)
     }
 }
